@@ -3,14 +3,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include <gtk/gtk.h>
+#include <cairo.h>
 #include <glib.h>
 #include <lightdm.h>
 
 #include "callbacks.h"
 #include "ui.h"
 #include "utils.h"
+
+#define UI_STACK_OVERLAY "overlay"
+#define UI_STACK_LOGIN "login"
 
 
 static UI *new_ui(void);
@@ -21,6 +26,8 @@ static void hide_mouse_cursor(GtkWidget *window, gpointer user_data);
 static void move_mouse_to_background_window(void);
 static void setup_main_window(Config *config, UI *ui);
 static void place_main_window(GtkWidget *main_window, gpointer user_data);
+static void create_and_attach_layout_stack(UI *ui);
+static void create_and_attach_overlay_container(UI *ui);
 static void create_and_attach_layout_container(UI *ui);
 static void create_and_attach_sys_info_label(Config *config, UI *ui);
 static void create_and_attach_password_field(Config *config, UI *ui);
@@ -36,7 +43,13 @@ UI *initialize_ui(Config *config)
     setup_background_windows(config, ui);
     move_mouse_to_background_window();
     setup_main_window(config, ui);
+    create_and_attach_layout_stack(ui);
+
+    create_and_attach_overlay_container(ui);
     create_and_attach_layout_container(ui);
+
+    gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_OVERLAY, GTK_STACK_TRANSITION_TYPE_OVER_DOWN);
+
     create_and_attach_sys_info_label(config, ui);
     create_and_attach_password_field(config, ui);
     create_and_attach_feedback_label(ui);
@@ -167,10 +180,14 @@ static void setup_main_window(Config *config, UI *ui)
 {
     GtkWindow *main_window = GTK_WINDOW(gtk_window_new(GTK_WINDOW_TOPLEVEL));
 
-    gtk_container_set_border_width(GTK_CONTAINER(main_window), config->layout_spacing);
+    // gtk_container_set_border_width(GTK_CONTAINER(main_window), config->layout_spacing);
     gtk_widget_set_name(GTK_WIDGET(main_window), "main");
 
-    g_signal_connect(main_window, "show", G_CALLBACK(place_main_window), NULL);
+    GdkDisplay *display = gdk_display_get_default();
+    GdkMonitor *monitor = gdk_display_get_monitor(display, 0);
+    set_window_to_monitor_size(monitor, GTK_WINDOW(main_window));
+
+    g_signal_connect(main_window, "show", G_CALLBACK(place_main_window), ui);
     g_signal_connect(main_window, "realize", G_CALLBACK(hide_mouse_cursor), NULL);
     g_signal_connect(main_window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
@@ -200,18 +217,133 @@ static void place_main_window(GtkWidget *main_window, gpointer user_data)
         GTK_WINDOW(main_window),
         primary_monitor_geometry.x + primary_monitor_geometry.width / 2 - window_width / 2,
         primary_monitor_geometry.y + primary_monitor_geometry.height / 2 - window_height / 2);
+
+    if(user_data != NULL) {
+        UI *ui = (UI*) user_data;
+        gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_LOGIN, GTK_STACK_TRANSITION_TYPE_UNDER_UP);
+    }
 }
 
 
-/* Add a Layout Container for All Displayed Widgets */
-static void create_and_attach_layout_container(UI *ui)
+/* Add a Stack for All Widgets */
+static void create_and_attach_layout_stack(UI *ui)
 {
-    ui->layout_container = GTK_GRID(gtk_grid_new());
-    gtk_grid_set_column_spacing(ui->layout_container, 5);
-    gtk_grid_set_row_spacing(ui->layout_container, 5);
+    ui->layout_stack = GTK_STACK(gtk_stack_new());
+    gtk_stack_set_transition_duration(GTK_STACK(ui->layout_stack), 1000);
 
     gtk_container_add(GTK_CONTAINER(ui->main_window),
-                      GTK_WIDGET(ui->layout_container));
+                    GTK_WIDGET(ui->layout_stack));
+
+}
+
+#define GAUSS_KERNEL_SIZE 17
+static GdkPixbuf *blur_pixbuf(GdkPixbuf *buf, int radius)
+{
+    GdkPixbuf *dest = gdk_pixbuf_copy(buf);
+
+    int width = gdk_pixbuf_get_width(buf);
+    int height = gdk_pixbuf_get_height(buf);
+    int stride = gdk_pixbuf_get_rowstride(buf);
+    int num_channels = gdk_pixbuf_get_n_channels(buf);
+
+    guchar *src_data = gdk_pixbuf_get_pixels(buf);
+    guchar *dst_data = gdk_pixbuf_get_pixels(dest);
+
+    g_assert(num_channels == 3);
+    g_assert(gdk_pixbuf_get_bits_per_sample(buf) == 8);
+
+    float sigma = (float)radius / 2.0f;
+    sigma = MAX(sigma, 1.0f);
+
+    // Kernel setup
+    const int kernel_width = (2 * radius) + 1;
+    float kernel[kernel_width][kernel_width];
+    float kernel_sum = 0;
+
+    // populate kernel
+    for (int ky = -radius; ky < radius; ky++) {
+        for (int kx = -radius; kx < radius; kx++) {
+            float e_numerator = (float) -(kx*kx + ky*ky);
+            float e_denominator = 2.0f * sigma*sigma;
+            float e_term = expf(e_numerator / e_denominator);
+
+            float kernel_value = e_term / (2.0f * M_PIf * sigma*sigma);
+            kernel[ky + radius][kx + radius] = kernel_value;
+            kernel_sum += kernel_value;
+        }
+    }
+    // normalize kernel
+    for (int ky = 0; ky < kernel_width; ky++) {
+        for (int kx = 0; kx < kernel_width; kx++) {
+            kernel[ky][kx] /= kernel_sum;
+        }
+    }
+
+    // TODO: handle edges
+    for (int y = radius; y < (height - radius); y++) {
+        for (int x = radius; x < (width - radius); x++) {
+            guchar *dst_pixel = dst_data + y * stride + x * num_channels;
+
+            float r, g, b;
+            r = g = b = 0.0f;
+
+            for (int ky = -radius; ky < radius; ky++) {
+                for (int kx = -radius; kx < radius; kx++) {
+                    float kernel_value = kernel[ky + radius][kx + radius];
+                    guchar *src_pixel = src_data + ((y + ky) * stride) + ((x + kx) * num_channels);
+
+                    r += src_pixel[0] * kernel_value;
+                    g += src_pixel[1] * kernel_value;
+                    b += src_pixel[2] * kernel_value;
+                }
+            }
+
+            dst_pixel[0] = (guchar) r;
+            dst_pixel[1] = (guchar) g;
+            dst_pixel[2] = (guchar) b;
+        }
+    }
+    
+
+   return dest;
+}
+
+/* Add a Layout Container for The login Widgets */
+static void create_and_attach_layout_container(UI *ui)
+{
+    ui->layout_container = GTK_LAYOUT(gtk_layout_new(NULL, NULL));
+
+    GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size("/home/david/Pictures/wallpaper.jpg", 800, 800, NULL);
+    GdkPixbuf *blurred_buf = blur_pixbuf(buf, 15);
+    g_object_unref(buf);
+
+    ui->login_background = GTK_IMAGE(gtk_image_new_from_pixbuf(blurred_buf));
+    gtk_container_add(GTK_CONTAINER(ui->layout_container),
+                    GTK_WIDGET(ui->login_background));
+
+    ui->login_container = GTK_GRID(gtk_grid_new());
+    gtk_grid_set_column_spacing(ui->login_container, 5);
+    gtk_grid_set_row_spacing(ui->login_container, 5);
+
+    gtk_container_add(GTK_CONTAINER(ui->layout_container),
+                    GTK_WIDGET(ui->login_container));
+
+    gtk_stack_add_named(GTK_STACK(ui->layout_stack),
+                      GTK_WIDGET(ui->layout_container),
+                      UI_STACK_LOGIN);
+}
+
+/* Add a Layout Container for overlay Widgets */
+static void create_and_attach_overlay_container(UI *ui)
+{
+    ui->overlay_container = GTK_GRID(gtk_grid_new());
+    gtk_grid_set_column_spacing(ui->overlay_container, 5);
+    gtk_grid_set_row_spacing(ui->overlay_container, 5);
+    gtk_widget_set_name(GTK_WIDGET(ui->overlay_container), "overlay");
+
+    gtk_stack_add_named(GTK_STACK(ui->layout_stack),
+                      GTK_WIDGET(ui->overlay_container),
+                      UI_STACK_OVERLAY);
 }
 
 /* Create a container for the system information & current time.
@@ -221,9 +353,9 @@ static void create_and_attach_layout_container(UI *ui)
  */
 static void create_and_attach_sys_info_label(Config *config, UI *ui)
 {
-    if (!config->show_sys_info) {
+    /*if (!config->show_sys_info) {
         return;
-    }
+    }*/
     // container for system info & time
     ui->info_container = GTK_GRID(gtk_grid_new());
     gtk_grid_set_column_spacing(ui->info_container, 0);
@@ -256,7 +388,7 @@ static void create_and_attach_sys_info_label(Config *config, UI *ui)
     gtk_grid_attach(
         ui->info_container, GTK_WIDGET(ui->time_label), 1, 0, 1, 1);
     gtk_grid_attach(
-        ui->layout_container, GTK_WIDGET(ui->info_container), 0, 0, 2, 1);
+        ui->login_container, GTK_WIDGET(ui->info_container), 0, 0, 2, 1);
 }
 
 
@@ -281,12 +413,12 @@ static void create_and_attach_password_field(Config *config, UI *ui)
                               config->password_input_width);
     gtk_widget_set_name(GTK_WIDGET(ui->password_input), "password");
     const gint top = config->show_sys_info ? 1 : 0;
-    gtk_grid_attach(ui->layout_container, ui->password_input, 1, top, 1, 1);
+    gtk_grid_attach(ui->login_container, ui->password_input, 1, top, 1, 1);
 
     if (config->show_password_label) {
         ui->password_label = gtk_label_new(config->password_label_text);
         gtk_label_set_justify(GTK_LABEL(ui->password_label), GTK_JUSTIFY_RIGHT);
-        gtk_grid_attach_next_to(ui->layout_container, ui->password_label,
+        gtk_grid_attach_next_to(ui->login_container, ui->password_label,
                                 ui->password_input, GTK_POS_LEFT, 1, 1);
     }
 }
@@ -310,7 +442,7 @@ static void create_and_attach_feedback_label(UI *ui)
         width = 2;
     }
 
-    gtk_grid_attach_next_to(ui->layout_container, ui->feedback_label,
+    gtk_grid_attach_next_to(ui->login_container, ui->feedback_label,
                             attachment_point, GTK_POS_BOTTOM, width, 1);
 }
 
@@ -355,7 +487,14 @@ static void attach_config_colors_to_screen(Config *config)
             "border-style: solid;\n"
         "}\n"
         "#main {\n"
-            "background-color: %s;\n"
+            // "background-color: %s;\n"
+        "}\n"
+        "#overlay {\n"
+            "background-color: #352a4a;\n"
+            "background-image: url(\"/home/david/Pictures/wallpaper.jpg\");\n"
+            "background-repeat: no-repeat;\n"
+            "background-size: 100%%;\n"
+            "background-position: center;\n"
         "}\n"
         "#password {\n"
             "color: %s;\n"
@@ -396,7 +535,7 @@ static void attach_config_colors_to_screen(Config *config)
         , config->border_width
         , gdk_rgba_to_string(config->border_color)
         // #main
-        , gdk_rgba_to_string(config->window_color)
+        // , gdk_rgba_to_string(config->window_color)
         // #password
         , gdk_rgba_to_string(config->password_color)
         , gdk_rgba_to_string(caret_color)

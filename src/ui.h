@@ -9,7 +9,13 @@ typedef struct UI_ {
     GtkWindow   **background_windows;
     int         monitor_count;
     GtkWindow   *main_window;
-    GtkGrid     *layout_container;
+    GtkBox      *layout_parent;
+    GtkStack    *layout_stack;
+
+    GtkLayout   *layout_container;
+    GtkGrid     *login_container;
+    GtkImage    *login_background;
+    GtkGrid     *overlay_container;
     GtkGrid     *info_container;
     GtkWidget   *sys_info_label;
     GtkWidget   *time_label;
