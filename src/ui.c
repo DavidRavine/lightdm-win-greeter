@@ -236,8 +236,11 @@ static void create_and_attach_layout_stack(UI *ui)
 
 }
 
-#define GAUSS_KERNEL_SIZE 17
-static GdkPixbuf *blur_pixbuf(GdkPixbuf *buf, int radius)
+/**
+ * Apply Gaussian Blur to a GdkPixBuf.
+ * Edges are treated as if a mirrored image was off to each side.
+*/
+static void blur_pixbuf(GdkPixbuf *buf, int radius)
 {
     GdkPixbuf *dest = gdk_pixbuf_copy(buf);
 
@@ -256,46 +259,76 @@ static GdkPixbuf *blur_pixbuf(GdkPixbuf *buf, int radius)
     sigma = MAX(sigma, 1.0f);
 
     // Kernel setup
-    const int kernel_width = (2 * radius) + 1;
-    float kernel[kernel_width][kernel_width];
+    const int kernel_width = (2*radius) + 1;
+    float kernel[kernel_width];
     float kernel_sum = 0;
 
     // populate kernel
-    for (int ky = -radius; ky < radius; ky++) {
-        for (int kx = -radius; kx < radius; kx++) {
-            float e_numerator = (float) -(kx*kx + ky*ky);
-            float e_denominator = 2.0f * sigma*sigma;
-            float e_term = expf(e_numerator / e_denominator);
+    for (int k = -radius; k < radius; k++) {
+        float e_numerator = (float) -(k*k);
+        float e_denominator = 2.0f * sigma*sigma;
+        float e_term = expf(e_numerator / e_denominator);
 
-            float kernel_value = e_term / (2.0f * M_PIf * sigma*sigma);
-            kernel[ky + radius][kx + radius] = kernel_value;
-            kernel_sum += kernel_value;
-        }
+        float kernel_value = e_term / (2.0f * M_PIf * sigma*sigma);
+        kernel[k + radius] = kernel_value;
+        kernel_sum += kernel_value;
     }
     // normalize kernel
-    for (int ky = 0; ky < kernel_width; ky++) {
-        for (int kx = 0; kx < kernel_width; kx++) {
-            kernel[ky][kx] /= kernel_sum;
-        }
+    for (int k = 0; k < kernel_width; k++) {
+        kernel[k] /= kernel_sum;
     }
 
-    // TODO: handle edges
-    for (int y = radius; y < (height - radius); y++) {
-        for (int x = radius; x < (width - radius); x++) {
+    // Horizontal blur
+    for (int y = 0; y < (height); y++) {
+        for (int x = 0; x < (width); x++) {
             guchar *dst_pixel = dst_data + y * stride + x * num_channels;
 
             float r, g, b;
             r = g = b = 0.0f;
 
-            for (int ky = -radius; ky < radius; ky++) {
-                for (int kx = -radius; kx < radius; kx++) {
-                    float kernel_value = kernel[ky + radius][kx + radius];
-                    guchar *src_pixel = src_data + ((y + ky) * stride) + ((x + kx) * num_channels);
+            for (int k = -radius; k < radius; k++) {
+                int src_x = x + k;
+                if (src_x < 0) {
+                    src_x = -src_x + 1;
+                } else if (src_x >= width) {
+                    src_x = width - (width - src_x);
+                }
+                float kernel_value = kernel[k + radius];
+                guchar *src_pixel = src_data + (y * stride) + (src_x * num_channels);
+
+                r += src_pixel[0] * kernel_value;
+                g += src_pixel[1] * kernel_value;
+                b += src_pixel[2] * kernel_value;
+            }
+
+            dst_pixel[0] = (guchar) r;
+            dst_pixel[1] = (guchar) g;
+            dst_pixel[2] = (guchar) b;
+        }
+    }
+
+    // vertical blur
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            guchar *dst_pixel = src_data + y * stride + x * num_channels;
+
+            float r, g, b;
+            r = g = b = 0.0f;
+
+            for (int k = -radius; k < radius; k++) {
+                int src_y = y + k;
+                if (src_y < 0) {
+                    src_y = -src_y + 1;
+                } else if (src_y >= height) {
+                    src_y = height - (height - src_y);
+                }
+
+                    float kernel_value = kernel[k + radius];
+                    guchar *src_pixel = dst_data + (src_y * stride) + (x * num_channels);
 
                     r += src_pixel[0] * kernel_value;
                     g += src_pixel[1] * kernel_value;
                     b += src_pixel[2] * kernel_value;
-                }
             }
 
             dst_pixel[0] = (guchar) r;
@@ -304,8 +337,7 @@ static GdkPixbuf *blur_pixbuf(GdkPixbuf *buf, int radius)
         }
     }
     
-
-   return dest;
+   g_object_unref(dest);
 }
 
 /* Add a Layout Container for The login Widgets */
@@ -314,10 +346,10 @@ static void create_and_attach_layout_container(UI *ui)
     ui->layout_container = GTK_LAYOUT(gtk_layout_new(NULL, NULL));
 
     GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size("/home/david/Pictures/wallpaper.jpg", 800, 800, NULL);
-    GdkPixbuf *blurred_buf = blur_pixbuf(buf, 15);
-    g_object_unref(buf);
+    blur_pixbuf(buf, 20);
+    //g_object_unref(buf);
 
-    ui->login_background = GTK_IMAGE(gtk_image_new_from_pixbuf(blurred_buf));
+    ui->login_background = GTK_IMAGE(gtk_image_new_from_pixbuf(buf));
     gtk_container_add(GTK_CONTAINER(ui->layout_container),
                     GTK_WIDGET(ui->login_background));
 
