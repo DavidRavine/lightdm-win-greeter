@@ -340,11 +340,8 @@ static void blur_pixbuf(GdkPixbuf *buf, int radius)
    g_object_unref(dest);
 }
 
-/* Add a Layout Container for The login Widgets */
-static void create_and_attach_layout_container(UI *ui, gchar *background_image)
+static void set_main_background(UI *ui, gchar *background_image)
 {
-    ui->layout_container = GTK_LAYOUT(gtk_layout_new(NULL, NULL));
-
     char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
     if (strlen(bg_url) > 0) {
         fprintf(stderr, "[GREETER] %s\n", bg_url);
@@ -352,8 +349,8 @@ static void create_and_attach_layout_container(UI *ui, gchar *background_image)
         gtk_window_get_size(ui->main_window, &window_width, &window_height);
 
         // get image aspect ratio
-        GError* err;
-        GdkPixbuf *tmp = gdk_pixbuf_new_from_file_at_size(bg_url, 200, 200, &err);
+
+        GdkPixbuf *tmp = gdk_pixbuf_new_from_file_at_size(bg_url, 200, 200, NULL);
         int bg_width = gdk_pixbuf_get_width(tmp);
         int bg_height = gdk_pixbuf_get_height(tmp);
         g_object_unref(tmp);
@@ -365,7 +362,7 @@ static void create_and_attach_layout_container(UI *ui, gchar *background_image)
 
         // load real image
         GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size(bg_url, background_size, background_size, NULL);
-        blur_pixbuf(buf, 20);
+        blur_pixbuf(buf, 25);
 
         // Center image
         int bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
@@ -379,6 +376,15 @@ static void create_and_attach_layout_container(UI *ui, gchar *background_image)
 
     }
     free(bg_url);
+
+}
+
+/* Add a Layout Container for The login Widgets */
+static void create_and_attach_layout_container(UI *ui, gchar *background_image)
+{
+    ui->layout_container = GTK_LAYOUT(gtk_layout_new(NULL, NULL));
+
+    set_main_background(ui, background_image);
 
     ui->login_container = GTK_GRID(gtk_grid_new());
     gtk_grid_set_column_spacing(ui->login_container, 5);
@@ -549,10 +555,10 @@ static void attach_config_colors_to_screen(Config *config)
             // "background-color: %s;\n"
         "}\n"
         "#overlay {\n"
-            "background-color: %s;\n"
+            "background-color: #CAFEBA;\n"
             "background-image: image(url(%s));\n"
             "background-repeat: no-repeat;\n"
-            "background-size: 100%%;\n"
+            "background-size: cover;\n"
             "background-position: center;\n"
         "}\n"
         "#password {\n"
@@ -596,8 +602,8 @@ static void attach_config_colors_to_screen(Config *config)
         // #main
         // , gdk_rgba_to_string(config->window_color)
         // #overlay
-        , gdk_rgba_to_string(config->background_color)
-        , "/home/vagrant/Pictures/wallpaper.jpg"
+        //, gdk_rgba_to_string(config->background_color)
+        , "\"/home/vagrant/Pictures/wallpaper-hd.jpg\""
         // , config->background_image
         // #password
         , gdk_rgba_to_string(config->password_color)
