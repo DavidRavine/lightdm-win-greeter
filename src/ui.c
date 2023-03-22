@@ -28,7 +28,7 @@ static void setup_main_window(Config *config, UI *ui);
 static void place_main_window(GtkWidget *main_window, gpointer user_data);
 static void create_and_attach_layout_stack(UI *ui);
 static void create_and_attach_overlay_container(UI *ui);
-static void create_and_attach_layout_container(UI *ui);
+static void create_and_attach_layout_container(UI *ui, gchar *background_image);
 static void create_and_attach_sys_info_label(Config *config, UI *ui);
 static void create_and_attach_password_field(Config *config, UI *ui);
 static void create_and_attach_feedback_label(UI *ui);
@@ -46,7 +46,7 @@ UI *initialize_ui(Config *config)
     create_and_attach_layout_stack(ui);
 
     create_and_attach_overlay_container(ui);
-    create_and_attach_layout_container(ui);
+    create_and_attach_layout_container(ui, config->background_image);
 
     gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_OVERLAY, GTK_STACK_TRANSITION_TYPE_OVER_DOWN);
 
@@ -341,17 +341,44 @@ static void blur_pixbuf(GdkPixbuf *buf, int radius)
 }
 
 /* Add a Layout Container for The login Widgets */
-static void create_and_attach_layout_container(UI *ui)
+static void create_and_attach_layout_container(UI *ui, gchar *background_image)
 {
     ui->layout_container = GTK_LAYOUT(gtk_layout_new(NULL, NULL));
 
-    GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size("/home/david/Pictures/wallpaper.jpg", 800, 800, NULL);
-    blur_pixbuf(buf, 20);
-    //g_object_unref(buf);
+    char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
+    if (strlen(bg_url) > 0) {
+        fprintf(stderr, "[GREETER] %s\n", bg_url);
+        int window_width, window_height;
+        gtk_window_get_size(ui->main_window, &window_width, &window_height);
 
-    ui->login_background = GTK_IMAGE(gtk_image_new_from_pixbuf(buf));
-    gtk_container_add(GTK_CONTAINER(ui->layout_container),
-                    GTK_WIDGET(ui->login_background));
+        // get image aspect ratio
+        GError* err;
+        GdkPixbuf *tmp = gdk_pixbuf_new_from_file_at_size(bg_url, 200, 200, &err);
+        int bg_width = gdk_pixbuf_get_width(tmp);
+        int bg_height = gdk_pixbuf_get_height(tmp);
+        g_object_unref(tmp);
+
+        double aspect = (double) bg_width / (double) bg_height;
+
+        // determine optimal image bounds
+        int background_size = (int) (MAX(window_width, window_height) * aspect);
+
+        // load real image
+        GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size(bg_url, background_size, background_size, NULL);
+        blur_pixbuf(buf, 20);
+
+        // Center image
+        int bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
+        int bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
+
+        ui->login_background = GTK_IMAGE(gtk_image_new_from_pixbuf(buf));
+        gtk_layout_put(GTK_LAYOUT(ui->layout_container),
+                        GTK_WIDGET(ui->login_background), bg_x_offset, bg_y_offset);
+        
+        g_object_unref(buf);
+
+    }
+    free(bg_url);
 
     ui->login_container = GTK_GRID(gtk_grid_new());
     gtk_grid_set_column_spacing(ui->login_container, 5);
@@ -522,8 +549,8 @@ static void attach_config_colors_to_screen(Config *config)
             // "background-color: %s;\n"
         "}\n"
         "#overlay {\n"
-            "background-color: #352a4a;\n"
-            "background-image: url(\"/home/david/Pictures/wallpaper.jpg\");\n"
+            "background-color: %s;\n"
+            "background-image: image(url(%s));\n"
             "background-repeat: no-repeat;\n"
             "background-size: 100%%;\n"
             "background-position: center;\n"
@@ -568,6 +595,10 @@ static void attach_config_colors_to_screen(Config *config)
         , gdk_rgba_to_string(config->border_color)
         // #main
         // , gdk_rgba_to_string(config->window_color)
+        // #overlay
+        , gdk_rgba_to_string(config->background_color)
+        , "/home/vagrant/Pictures/wallpaper.jpg"
+        // , config->background_image
         // #password
         , gdk_rgba_to_string(config->password_color)
         , gdk_rgba_to_string(caret_color)
