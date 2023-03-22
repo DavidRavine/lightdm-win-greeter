@@ -49,12 +49,15 @@ lightdm_mini_greeter_SOURCES = \
 							src/config.c \
 							src/focus_ring.c \
 							src/ui.c \
+							src/ui_login.c \
 							src/utils.c
 
 lightdm_mini_greeter_CFLAGS = \
 							$(AM_CFLAGS) \
 							$(GTK_CFLAGS) \
 							$(LIGHTDM_CFLAGS)
+							
 lightdm_mini_greeter_LDADD = \
 							$(GTK_LIBS) \
-							$(LIGHTDM_LIBS)
+							$(LIGHTDM_LIBS) \
+							-lm

@@ -18,7 +18,7 @@
 #define UI_STACK_LOGIN "login"
 
 
-static UI *new_ui(void);
+static UI *new_ui(Config *config);
 static void setup_background_windows(Config *config, UI *ui);
 static GtkWindow *new_background_window(GdkMonitor *monitor);
 static void set_window_to_monitor_size(GdkMonitor *monitor, GtkWindow *window);
@@ -28,17 +28,15 @@ static void setup_main_window(Config *config, UI *ui);
 static void place_main_window(GtkWidget *main_window, gpointer user_data);
 static void create_and_attach_layout_stack(UI *ui);
 static void create_and_attach_overlay_container(UI *ui);
+static void set_main_background(UI *ui, gchar *background_image);
 static void create_and_attach_layout_container(UI *ui, gchar *background_image);
-static void create_and_attach_sys_info_label(Config *config, UI *ui);
-static void create_and_attach_password_field(Config *config, UI *ui);
-static void create_and_attach_feedback_label(UI *ui);
 static void attach_config_colors_to_screen(Config *config);
 
 
 /* Initialize the Main Window & it's Children */
 UI *initialize_ui(Config *config)
 {
-    UI *ui = new_ui();
+    UI *ui = new_ui(config);
 
     setup_background_windows(config, ui);
     move_mouse_to_background_window();
@@ -50,9 +48,6 @@ UI *initialize_ui(Config *config)
 
     gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_OVERLAY, GTK_STACK_TRANSITION_TYPE_OVER_DOWN);
 
-    create_and_attach_sys_info_label(config, ui);
-    create_and_attach_password_field(config, ui);
-    create_and_attach_feedback_label(ui);
     attach_config_colors_to_screen(config);
 
     return ui;
@@ -60,7 +55,7 @@ UI *initialize_ui(Config *config)
 
 
 /* Create a new UI with all values initialized to NULL */
-static UI *new_ui(void)
+static UI *new_ui(Config *config)
 {
     UI *ui = malloc(sizeof(UI));
     if (ui == NULL) {
@@ -69,10 +64,12 @@ static UI *new_ui(void)
     ui->background_windows = NULL;
     ui->monitor_count = 0;
     ui->main_window = NULL;
-    ui->layout_container = NULL;
-    ui->password_label = NULL;
-    ui->password_input = NULL;
-    ui->feedback_label = NULL;
+
+    ui->layout = NULL;
+    ui->layout_vertical = NULL;
+    ui->overlay_container = NULL;
+
+    ui->login_ui = initialize_login_ui(config);
 
     return ui;
 }
@@ -340,6 +337,21 @@ static void blur_pixbuf(GdkPixbuf *buf, int radius)
    g_object_unref(dest);
 }
 
+struct BackgroundPixbuf {
+    GdkPixbuf* buf;
+    gdouble x;
+    gdouble y;
+};
+
+static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer data)
+{
+    struct BackgroundPixbuf* bg = (struct BackgroundPixbuf*) data;
+    gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
+    cairo_paint(cr);
+
+    return FALSE;
+}
+
 static void set_main_background(UI *ui, gchar *background_image)
 {
     char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
@@ -365,15 +377,17 @@ static void set_main_background(UI *ui, gchar *background_image)
         blur_pixbuf(buf, 25);
 
         // Center image
-        int bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
-        int bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
+        gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
+        gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
 
-        ui->login_background = GTK_IMAGE(gtk_image_new_from_pixbuf(buf));
-        gtk_layout_put(GTK_LAYOUT(ui->layout_container),
-                        GTK_WIDGET(ui->login_background), bg_x_offset, bg_y_offset);
+
+        // !!! This is never freed !!!
+        struct BackgroundPixbuf *bg = malloc(sizeof(struct BackgroundPixbuf));
+        bg->buf = buf;
+        bg->x = bg_x_offset;
+        bg->y = bg_y_offset;
         
-        g_object_unref(buf);
-
+        g_signal_connect(G_OBJECT(ui->layout), "draw", G_CALLBACK(draw_blurred_background), bg);
     }
     free(bg_url);
 
@@ -382,19 +396,20 @@ static void set_main_background(UI *ui, gchar *background_image)
 /* Add a Layout Container for The login Widgets */
 static void create_and_attach_layout_container(UI *ui, gchar *background_image)
 {
-    ui->layout_container = GTK_LAYOUT(gtk_layout_new(NULL, NULL));
-
+    ui->layout = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5));
+    ui->layout_vertical = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 5));
+    gtk_widget_set_name(GTK_WIDGET(ui->layout_vertical), "layout-box");
+    
     set_main_background(ui, background_image);
 
-    ui->login_container = GTK_GRID(gtk_grid_new());
-    gtk_grid_set_column_spacing(ui->login_container, 5);
-    gtk_grid_set_row_spacing(ui->login_container, 5);
+    gtk_box_set_center_widget(GTK_BOX(ui->layout_vertical),
+                            GTK_WIDGET(ui->login_ui->login_container));
 
-    gtk_container_add(GTK_CONTAINER(ui->layout_container),
-                    GTK_WIDGET(ui->login_container));
+    gtk_box_set_center_widget(GTK_BOX(ui->layout),
+                            GTK_WIDGET(ui->layout_vertical));
 
     gtk_stack_add_named(GTK_STACK(ui->layout_stack),
-                      GTK_WIDGET(ui->layout_container),
+                      GTK_WIDGET(ui->layout),
                       UI_STACK_LOGIN);
 }
 
@@ -406,109 +421,39 @@ static void create_and_attach_overlay_container(UI *ui)
     gtk_grid_set_row_spacing(ui->overlay_container, 5);
     gtk_widget_set_name(GTK_WIDGET(ui->overlay_container), "overlay");
 
+    // time: filled out by callback
+    ui->time_label = gtk_label_new("Time");
+    gtk_widget_set_vexpand(GTK_WIDGET(ui->time_label), TRUE);
+
+    gtk_label_set_yalign(GTK_LABEL(ui->time_label), 1.0f);
+    gtk_label_set_xalign(GTK_LABEL(ui->time_label), 1.0f);
+    gtk_widget_set_name(GTK_WIDGET(ui->time_label), "time-info");
+
+    ui->date_label = gtk_label_new("Date");
+    gtk_widget_set_name(GTK_WIDGET(ui->date_label), "date-info");
+    gtk_label_set_xalign(GTK_LABEL(ui->date_label), 1.0f);
+
+    gtk_grid_attach(
+        ui->overlay_container, GTK_WIDGET(ui->time_label), 0, 0, 1, 1);
+    gtk_grid_attach(
+        ui->overlay_container, GTK_WIDGET(ui->date_label), 0, 1, 1, 1);
+
+    // TODO Battery and network status
+    ui->battery_display = gtk_label_new("Bat");
+    gtk_widget_set_hexpand(GTK_WIDGET(ui->battery_display), TRUE);
+    gtk_label_set_xalign(GTK_LABEL(ui->time_label), 1.0f);
+
+    ui->network_display = gtk_label_new("Net");
+    gtk_widget_set_hexpand(GTK_WIDGET(ui->network_display), FALSE);
+
+    gtk_grid_attach(
+        ui->overlay_container, GTK_WIDGET(ui->battery_display), 2, 1, 1, 1);
+    gtk_grid_attach(
+        ui->overlay_container, GTK_WIDGET(ui->network_display), 3, 1, 1, 1);
+
     gtk_stack_add_named(GTK_STACK(ui->layout_stack),
                       GTK_WIDGET(ui->overlay_container),
                       UI_STACK_OVERLAY);
-}
-
-/* Create a container for the system information & current time.
- *
- * Set the system information text by querying LightDM & the Config, but leave
- * the time blank & let the timer update it.
- */
-static void create_and_attach_sys_info_label(Config *config, UI *ui)
-{
-    /*if (!config->show_sys_info) {
-        return;
-    }*/
-    // container for system info & time
-    ui->info_container = GTK_GRID(gtk_grid_new());
-    gtk_grid_set_column_spacing(ui->info_container, 0);
-    gtk_grid_set_row_spacing(ui->info_container, 5);
-    gtk_widget_set_name(GTK_WIDGET(ui->info_container), "info");
-
-    // system info: <user>@<hostname>
-    const gchar *hostname = lightdm_get_hostname();
-    gchar *output_string;
-    int output_string_length = asprintf(&output_string, "%s@%s",
-                                        config->login_user, hostname);
-    if (output_string_length >= 0) {
-        ui->sys_info_label = gtk_label_new(output_string);
-    } else {
-        g_warning("Could not allocate memory for system info string.");
-        ui->sys_info_label = gtk_label_new("");
-    }
-    gtk_label_set_xalign(GTK_LABEL(ui->sys_info_label), 0.0f);
-    gtk_widget_set_name(GTK_WIDGET(ui->sys_info_label), "sys-info");
-
-    // time: filled out by callback
-    ui->time_label = gtk_label_new("");
-    gtk_label_set_xalign(GTK_LABEL(ui->time_label), 1.0f);
-    gtk_widget_set_hexpand(GTK_WIDGET(ui->time_label), TRUE);
-    gtk_widget_set_name(GTK_WIDGET(ui->time_label), "time-info");
-
-    // attach labels to info container, attach info container to layout.
-    gtk_grid_attach(
-        ui->info_container, GTK_WIDGET(ui->sys_info_label), 0, 0, 1, 1);
-    gtk_grid_attach(
-        ui->info_container, GTK_WIDGET(ui->time_label), 1, 0, 1, 1);
-    gtk_grid_attach(
-        ui->login_container, GTK_WIDGET(ui->info_container), 0, 0, 2, 1);
-}
-
-
-/* Add a label & entry field for the user's password.
- *
- * If the `show_password_label` member of `config` is FALSE,
- * `ui->password_label` is left as NULL.
- */
-static void create_and_attach_password_field(Config *config, UI *ui)
-{
-    ui->password_input = gtk_entry_new();
-    gtk_entry_set_visibility(GTK_ENTRY(ui->password_input), FALSE);
-    if (config->password_char != NULL) {
-        gtk_entry_set_invisible_char(GTK_ENTRY(ui->password_input), *config->password_char);
-    }
-    gtk_entry_set_alignment(GTK_ENTRY(ui->password_input),
-                            config->password_alignment);
-    // TODO: The width is usually a little shorter than we specify. Is there a
-    // way to force this exact character width?
-    // Maybe use 2 GtkBoxes instead of a GtkGrid?
-    gtk_entry_set_width_chars(GTK_ENTRY(ui->password_input),
-                              config->password_input_width);
-    gtk_widget_set_name(GTK_WIDGET(ui->password_input), "password");
-    const gint top = config->show_sys_info ? 1 : 0;
-    gtk_grid_attach(ui->login_container, ui->password_input, 1, top, 1, 1);
-
-    if (config->show_password_label) {
-        ui->password_label = gtk_label_new(config->password_label_text);
-        gtk_label_set_justify(GTK_LABEL(ui->password_label), GTK_JUSTIFY_RIGHT);
-        gtk_grid_attach_next_to(ui->login_container, ui->password_label,
-                                ui->password_input, GTK_POS_LEFT, 1, 1);
-    }
-}
-
-
-/* Add a label for feedback to the user */
-static void create_and_attach_feedback_label(UI *ui)
-{
-    ui->feedback_label = gtk_label_new("");
-    gtk_label_set_justify(GTK_LABEL(ui->feedback_label), GTK_JUSTIFY_CENTER);
-    gtk_widget_set_no_show_all(ui->feedback_label, TRUE);
-    gtk_widget_set_name(GTK_WIDGET(ui->feedback_label), "error");
-
-    GtkWidget *attachment_point;
-    gint width;
-    if (ui->password_label == NULL) {
-        attachment_point = ui->password_input;
-        width = 1;
-    } else {
-        attachment_point = ui->password_label;
-        width = 2;
-    }
-
-    gtk_grid_attach_next_to(ui->login_container, ui->feedback_label,
-                            attachment_point, GTK_POS_BOTTOM, width, 1);
 }
 
 /* Attach a style provider to the screen, using color options from config */
@@ -527,10 +472,24 @@ static void attach_config_colors_to_screen(Config *config)
     int css_string_length = asprintf(&css,
         "* {\n"
             "font-family: %s;\n"
+            "font-family: \"Ubuntu\", \"Sans\";\n"
+            "font-weight: 500;"
             "font-size: %s;\n"
-            "font-weight: %s;\n"
-            "font-style: %s;\n"
+            "color: #f1f1f1;\n"
         "}\n"
+        "#time-info {\n"
+            "padding-left: 1rem;\n"
+            "font-size: 8em;\n"
+            "font-weight: 300;"
+        "\n}"
+        "#date-info {\n"
+            "padding-right: 0.7rem;\n"
+            "font-size: 2em;\n"
+            "font-weight: 200;"
+        "\n}"
+        "#layout-box {\n"
+            "background-color: #dd4444;\n"
+        "\n}"
         "label {\n"
             "color: %s;\n"
         "}\n"
@@ -555,6 +514,7 @@ static void attach_config_colors_to_screen(Config *config)
             // "background-color: %s;\n"
         "}\n"
         "#overlay {\n"
+            "padding: 3em 2em;\n"
             "background-color: #CAFEBA;\n"
             "background-image: image(url(%s));\n"
             "background-repeat: no-repeat;\n"
@@ -584,8 +544,6 @@ static void attach_config_colors_to_screen(Config *config)
         // *
         , config->font
         , config->font_size
-        , config->font_weight
-        , config->font_style
         // label
         , gdk_rgba_to_string(config->text_color)
         // label#error

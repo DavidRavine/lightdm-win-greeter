@@ -2,6 +2,7 @@
 #define UI_H
 
 #include <gtk/gtk.h>
+#include "ui_login.h"
 #include "config.h"
 
 
@@ -9,19 +10,18 @@ typedef struct UI_ {
     GtkWindow   **background_windows;
     int         monitor_count;
     GtkWindow   *main_window;
-    GtkBox      *layout_parent;
     GtkStack    *layout_stack;
 
-    GtkLayout   *layout_container;
-    GtkGrid     *login_container;
-    GtkImage    *login_background;
+    GtkBox      *layout;
+    GtkBox      *layout_vertical;
+
     GtkGrid     *overlay_container;
-    GtkGrid     *info_container;
-    GtkWidget   *sys_info_label;
     GtkWidget   *time_label;
-    GtkWidget   *password_label;
-    GtkWidget   *password_input;
-    GtkWidget   *feedback_label;
+    GtkWidget   *date_label;
+    GtkWidget   *battery_display;
+    GtkWidget   *network_display;
+
+    LoginUI     *login_ui;
 } UI;
 
 

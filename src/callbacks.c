@@ -135,9 +135,12 @@ gboolean handle_time_update(App *app)
 {
     time_t now = time(NULL);
     struct tm *local_now = localtime(&now);
-    gchar date_string[30];
-    strftime(date_string, 29, "%H:%M", local_now);
-    gtk_label_set_text(GTK_LABEL(APP_TIME_LABEL(app)), date_string);
+    gchar time_string[30];
+    gchar date_string[50];
+    strftime(time_string, 29, "%H:%M", local_now);
+    strftime(date_string, 29, "%A, %d.%m.%Y", local_now);
+    gtk_label_set_text(GTK_LABEL(APP_TIME_LABEL(app)), time_string);
+    gtk_label_set_text(GTK_LABEL(APP_DATE_LABEL(app)), date_string);
 
     return TRUE;
 }
