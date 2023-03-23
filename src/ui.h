@@ -6,6 +6,13 @@
 #include "config.h"
 
 
+struct BackgroundPixbuf {
+    GdkPixbuf* buf;
+    gdouble x;
+    gdouble y;
+};
+
+
 typedef struct UI_ {
     GtkWindow   **background_windows;
     int         monitor_count;
@@ -22,6 +29,9 @@ typedef struct UI_ {
     GtkWidget   *network_display;
 
     LoginUI     *login_ui;
+
+    struct BackgroundPixbuf* overlay_bg;
+    struct BackgroundPixbuf* login_bg;
 } UI;
 
 

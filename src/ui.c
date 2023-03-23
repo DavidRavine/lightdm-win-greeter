@@ -27,8 +27,9 @@ static void move_mouse_to_background_window(void);
 static void setup_main_window(Config *config, UI *ui);
 static void place_main_window(GtkWidget *main_window, gpointer user_data);
 static void create_and_attach_layout_stack(UI *ui);
+static void init_background_image(UI* ui, gchar* background_image);
 static void create_and_attach_overlay_container(UI *ui);
-static void set_main_background(UI *ui, gchar *background_image);
+// static void set_main_background(UI *ui, gchar *background_image);
 static void create_and_attach_layout_container(UI *ui, gchar *background_image);
 static void attach_config_colors_to_screen(Config *config);
 
@@ -38,9 +39,12 @@ UI *initialize_ui(Config *config)
 {
     UI *ui = new_ui(config);
 
+    // Setup Windows
     setup_background_windows(config, ui);
     move_mouse_to_background_window();
     setup_main_window(config, ui);
+
+    init_background_image(ui, config->background_image);
     create_and_attach_layout_stack(ui);
 
     create_and_attach_overlay_container(ui);
@@ -185,7 +189,6 @@ static void setup_main_window(Config *config, UI *ui)
     set_window_to_monitor_size(monitor, GTK_WINDOW(main_window));
 
     g_signal_connect(main_window, "show", G_CALLBACK(place_main_window), ui);
-    g_signal_connect(main_window, "realize", G_CALLBACK(hide_mouse_cursor), NULL);
     g_signal_connect(main_window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     ui->main_window = main_window;
@@ -337,11 +340,30 @@ static void blur_pixbuf(GdkPixbuf *buf, int radius)
    g_object_unref(dest);
 }
 
-struct BackgroundPixbuf {
-    GdkPixbuf* buf;
-    gdouble x;
-    gdouble y;
-};
+static gboolean draw_overlay_background(GtkWidget *widget, cairo_t *cr, gpointer data)
+{
+    struct BackgroundPixbuf* bg = (struct BackgroundPixbuf*) data;
+    gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
+    cairo_paint(cr);
+
+    // overlay the gradient
+    GtkAllocation rect = {0};
+    gtk_widget_get_allocation(widget, &rect);
+
+    cairo_pattern_t* gradient = cairo_pattern_create_linear(0, 0, 0, rect.height);
+
+    cairo_pattern_add_color_stop_rgba(gradient, 0, 0, 0, 0, 0);
+    cairo_pattern_add_color_stop_rgba(gradient, 0.55, 0, 0, 0, 0);
+    cairo_pattern_add_color_stop_rgba(gradient, 0.9, 0, 0, 0, 0.3);
+
+    cairo_rectangle(cr, 0, 0, rect.width, rect.height);
+    cairo_set_source(cr, gradient);
+    cairo_fill(cr);
+
+    cairo_pattern_destroy(gradient);
+
+    return FALSE;
+}
 
 static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
@@ -349,10 +371,14 @@ static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer
     gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
     cairo_paint(cr);
 
+    cairo_set_source_rgba(cr, 0, 0, 0, 0.4);
+
+    cairo_paint(cr);
+
     return FALSE;
 }
 
-static void set_main_background(UI *ui, gchar *background_image)
+static void init_background_image(UI* ui, gchar* background_image)
 {
     char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
     if (strlen(bg_url) > 0) {
@@ -361,7 +387,6 @@ static void set_main_background(UI *ui, gchar *background_image)
         gtk_window_get_size(ui->main_window, &window_width, &window_height);
 
         // get image aspect ratio
-
         GdkPixbuf *tmp = gdk_pixbuf_new_from_file_at_size(bg_url, 200, 200, NULL);
         int bg_width = gdk_pixbuf_get_width(tmp);
         int bg_height = gdk_pixbuf_get_height(tmp);
@@ -374,23 +399,27 @@ static void set_main_background(UI *ui, gchar *background_image)
 
         // load real image
         GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size(bg_url, background_size, background_size, NULL);
-        blur_pixbuf(buf, 25);
-
         // Center image
         gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
         gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
 
-
-        // !!! This is never freed !!!
-        struct BackgroundPixbuf *bg = malloc(sizeof(struct BackgroundPixbuf));
-        bg->buf = buf;
-        bg->x = bg_x_offset;
-        bg->y = bg_y_offset;
+        ui->overlay_bg = malloc(sizeof(struct BackgroundPixbuf));
+        ui->overlay_bg->buf = buf;
+        ui->overlay_bg->x = bg_x_offset;
+        ui->overlay_bg->y = bg_y_offset;
         
-        g_signal_connect(G_OBJECT(ui->layout), "draw", G_CALLBACK(draw_blurred_background), bg);
+        // Blurred Background
+        GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_width, window_height);
+        gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_width, window_height, blurred_buf, 0, 0);
+        blur_pixbuf(blurred_buf, 25);
+
+        ui->login_bg = malloc(sizeof(struct BackgroundPixbuf));
+        ui->login_bg->buf = blurred_buf;
+        ui->login_bg->x = 0;
+        ui->login_bg->y = 0;
+
     }
     free(bg_url);
-
 }
 
 /* Add a Layout Container for The login Widgets */
@@ -400,7 +429,8 @@ static void create_and_attach_layout_container(UI *ui, gchar *background_image)
     ui->layout_vertical = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 5));
     gtk_widget_set_name(GTK_WIDGET(ui->layout_vertical), "layout-box");
     
-    set_main_background(ui, background_image);
+    // set_main_background(ui, background_image);
+    g_signal_connect(G_OBJECT(ui->layout), "draw", G_CALLBACK(draw_blurred_background), ui->login_bg);
 
     gtk_box_set_center_widget(GTK_BOX(ui->layout_vertical),
                             GTK_WIDGET(ui->login_ui->login_container));
@@ -420,6 +450,8 @@ static void create_and_attach_overlay_container(UI *ui)
     gtk_grid_set_column_spacing(ui->overlay_container, 5);
     gtk_grid_set_row_spacing(ui->overlay_container, 5);
     gtk_widget_set_name(GTK_WIDGET(ui->overlay_container), "overlay");
+
+    g_signal_connect(G_OBJECT(ui->overlay_container), "draw", G_CALLBACK(draw_overlay_background), ui->overlay_bg);
 
     // time: filled out by callback
     ui->time_label = gtk_label_new("Time");
@@ -457,18 +489,18 @@ static void create_and_attach_overlay_container(UI *ui)
 }
 
 /* Attach a style provider to the screen, using color options from config */
-static void attach_config_colors_to_screen(Config *config)
+static void attach_config_colors_to_screen(Config* config)
 {
     GtkCssProvider* provider = gtk_css_provider_new();
 
-    GdkRGBA *caret_color;
+    GdkRGBA* caret_color;
     if (config->show_input_cursor) {
         caret_color = config->password_color;
     } else {
         caret_color = config->password_background_color;
     }
 
-    char *css;
+    char* css;
     int css_string_length = asprintf(&css,
         "* {\n"
             "font-family: %s;\n"
@@ -486,9 +518,6 @@ static void attach_config_colors_to_screen(Config *config)
             "padding-right: 0.7rem;\n"
             "font-size: 2em;\n"
             "font-weight: 200;"
-        "\n}"
-        "#layout-box {\n"
-            "background-color: #dd4444;\n"
         "\n}"
         "label {\n"
             "color: %s;\n"
@@ -515,29 +544,30 @@ static void attach_config_colors_to_screen(Config *config)
         "}\n"
         "#overlay {\n"
             "padding: 3em 2em;\n"
-            "background-color: #CAFEBA;\n"
-            "background-image: image(url(%s));\n"
-            "background-repeat: no-repeat;\n"
-            "background-size: cover;\n"
-            "background-position: center;\n"
+            // "background-color: #CAFEBA;\n"
         "}\n"
         "#password {\n"
             "color: %s;\n"
             "caret-color: %s;\n"
             "background-color: %s;\n"
             "border-width: %s;\n"
+            "border-width: 0.1rem;\n"
             "border-color: %s;\n"
-            "border-radius: %s;\n"
+            "border-radius: 0;\n"
             "background-image: none;\n"
             "box-shadow: none;\n"
             "border-image-width: 0;\n"
         "}\n"
-        "#info {\n"
-            "margin: %s;\n"
+        "#login-button {\n"
+            "border-radius: 0px;\n"
+            "color: white;\n"
+            "background: #f1f1f1;\n"
+            "border-color: #f1f1f1;\n"
+            "border-width: 0.1rem;\n"
         "}\n"
-        "#info label {\n"
-            "font-family: %s;\n"
-            "font-size: %s;\n"
+        "#current-user {\n"
+            "font-family: \"Ubuntu\", %s;\n"
+            "font-size: 1.5em;\n"
             "color: %s;\n"
         "}\n"
 
@@ -561,7 +591,6 @@ static void attach_config_colors_to_screen(Config *config)
         // , gdk_rgba_to_string(config->window_color)
         // #overlay
         //, gdk_rgba_to_string(config->background_color)
-        , "\"/home/vagrant/Pictures/wallpaper-hd.jpg\""
         // , config->background_image
         // #password
         , gdk_rgba_to_string(config->password_color)
@@ -569,12 +598,8 @@ static void attach_config_colors_to_screen(Config *config)
         , gdk_rgba_to_string(config->password_background_color)
         , config->password_border_width
         , gdk_rgba_to_string(config->password_border_color)
-        , config->password_border_radius
-        // #info
-        , config->sys_info_margin
         // #info label
         , config->sys_info_font
-        , config->sys_info_font_size
         , gdk_rgba_to_string(config->sys_info_color)
     );
 
