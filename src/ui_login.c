@@ -73,6 +73,7 @@ static void create_and_attach_password_field(Config* config, LoginUI* ui)
     
     // Create the arrow-button
     ui->login_button = GTK_BUTTON(gtk_button_new());
+
     gtk_widget_set_name(GTK_WIDGET(ui->login_button), "login-button");
     gtk_button_set_relief(GTK_BUTTON(ui->login_button), GTK_RELIEF_NONE);
     GdkPixbuf* icon = gtk_icon_theme_load_icon(gtk_icon_theme_get_default(),

@@ -31,6 +31,9 @@ App *initialize_app(int argc, char **argv)
     app->password_callback_id =
         g_signal_connect(GTK_ENTRY(APP_PASSWORD_INPUT(app)), "activate",
                          G_CALLBACK(handle_password), app);
+    app->button_password_callback_id =
+        g_signal_connect(GTK_BUTTON(APP_LOGIN_BUTTON(app)), "activate",
+                         G_CALLBACK(handle_password), app);
     // This was added to fix a bug where the background window would be focused
     // instead of the main window, preventing users from entering their password.
     // It's undocument & probably not necessary any more. Investigate & remove.

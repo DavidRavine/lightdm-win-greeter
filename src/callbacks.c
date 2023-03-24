@@ -63,6 +63,8 @@ void handle_password(GtkWidget *password_input, App *app)
     if (app->password_callback_id != 0) {
         g_signal_handler_disconnect(GTK_ENTRY(APP_PASSWORD_INPUT(app)),
                                     app->password_callback_id);
+        g_signal_handler_disconnect(GTK_BUTTON(APP_LOGIN_BUTTON(app)),
+                                    app->button_password_callback_id);
         app->password_callback_id = 0;
     }
 

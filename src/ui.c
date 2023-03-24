@@ -23,7 +23,9 @@ static void setup_background_windows(Config *config, UI *ui);
 static GtkWindow *new_background_window(GdkMonitor *monitor);
 static void set_window_to_monitor_size(GdkMonitor *monitor, GtkWindow *window);
 static void hide_mouse_cursor(GtkWidget *window, gpointer user_data);
-static void move_mouse_to_background_window(void);
+static void show_default_cursor(GtkWidget *window, gpointer user_data);
+// static void move_mouse_to_background_window(void);
+
 static void setup_main_window(Config *config, UI *ui);
 static void place_main_window(GtkWidget *main_window, gpointer user_data);
 static void create_and_attach_layout_stack(UI *ui);
@@ -41,7 +43,7 @@ UI *initialize_ui(Config *config)
 
     // Setup Windows
     setup_background_windows(config, ui);
-    move_mouse_to_background_window();
+    // move_mouse_to_background_window();
     setup_main_window(config, ui);
 
     init_background_image(ui, config->background_image);
@@ -156,6 +158,15 @@ static void hide_mouse_cursor(GtkWidget *widget, gpointer user_data)
         gdk_window_set_cursor(window, blank_cursor);
     }
 }
+static void show_default_cursor(GtkWidget *widget, gpointer user_data)
+{
+    GdkDisplay *display = gdk_display_get_default();
+    GdkCursor *cursor = gdk_cursor_new_for_display(display, GDK_ARROW);
+    GdkWindow *window = gtk_widget_get_window(widget);
+    if (window != NULL) {
+        gdk_window_set_cursor(window, cursor);
+    }
+}
 
 
 /* Move the mouse cursor to the upper-left corner of the primary screen.
@@ -166,14 +177,14 @@ static void hide_mouse_cursor(GtkWidget *widget, gpointer user_data)
  * mouse to the corner of the screen where it should hover over the background
  * window or main window instead.
  */
-static void move_mouse_to_background_window(void)
-{
-    GdkDisplay *display = gdk_display_get_default();
-    GdkDevice *mouse = gdk_seat_get_pointer(gdk_display_get_default_seat(display));
-    GdkScreen *screen = gdk_display_get_default_screen(display);
+// static void move_mouse_to_background_window(void)
+// {
+//     GdkDisplay *display = gdk_display_get_default();
+//     GdkDevice *mouse = gdk_seat_get_pointer(gdk_display_get_default_seat(display));
+//     GdkScreen *screen = gdk_display_get_default_screen(display);
 
-    gdk_device_warp(mouse, screen, 0, 0);
-}
+//     gdk_device_warp(mouse, screen, 0, 0);
+// }
 
 
 /* Create & Configure the Main Window */
@@ -189,6 +200,8 @@ static void setup_main_window(Config *config, UI *ui)
     set_window_to_monitor_size(monitor, GTK_WINDOW(main_window));
 
     g_signal_connect(main_window, "show", G_CALLBACK(place_main_window), ui);
+    g_signal_connect(main_window, "realize", G_CALLBACK(show_default_cursor),
+                     NULL);
     g_signal_connect(main_window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     ui->main_window = main_window;
@@ -378,39 +391,59 @@ static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer
     return FALSE;
 }
 
+static void calculate_background_size(GdkPixbufLoader* loader, guint width, guint height, gpointer data)
+{
+    int* window_size = (int*) data;
+    // determine optimal image bounds
+    int bg_width, bg_height;
+    if (width > height) {
+        double aspect = (double) width / (double) height;
+        bg_width = (int) (window_size[1] * aspect);
+        bg_height = (int) (window_size[1]);
+    } else {
+        double aspect = (double) height / (double) width;
+        bg_width = (int) (window_size[0]);
+        bg_height = (int) (window_size[0] * aspect);
+    }
+    gdk_pixbuf_loader_set_size(loader, bg_width, bg_height);
+}
+
 static void init_background_image(UI* ui, gchar* background_image)
 {
     char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
     if (strlen(bg_url) > 0) {
         fprintf(stderr, "[GREETER] %s\n", bg_url);
-        int window_width, window_height;
-        gtk_window_get_size(ui->main_window, &window_width, &window_height);
+        int window_size[2] =  {0};
+        gtk_window_get_size(ui->main_window, &window_size[0], &window_size[1]);
 
-        // get image aspect ratio
-        GdkPixbuf *tmp = gdk_pixbuf_new_from_file_at_size(bg_url, 200, 200, NULL);
-        int bg_width = gdk_pixbuf_get_width(tmp);
-        int bg_height = gdk_pixbuf_get_height(tmp);
-        g_object_unref(tmp);
+        GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
+        // set the correct size during loading
+        g_signal_connect(loader, "size-prepared",
+                        G_CALLBACK(calculate_background_size), window_size);
+        
+        // load image from file
+        gchar* file_buffer;
+        gsize read_bytes;
+        g_file_get_contents(bg_url, &file_buffer, &read_bytes, NULL);
+        gdk_pixbuf_loader_write(loader, (guchar*)file_buffer, read_bytes, NULL);
+        g_free(file_buffer);
+        gdk_pixbuf_loader_close(loader, NULL);
 
-        double aspect = (double) bg_width / (double) bg_height;
+        GdkPixbuf *buf = gdk_pixbuf_loader_get_pixbuf(loader);
 
-        // determine optimal image bounds
-        int background_size = (int) (MAX(window_width, window_height) * aspect);
+        // Offset to center the image
+        gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_size[0] / 2));
+        gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_size[1] / 2));
 
-        // load real image
-        GdkPixbuf *buf = gdk_pixbuf_new_from_file_at_size(bg_url, background_size, background_size, NULL);
-        // Center image
-        gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
-        gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
-
+        // Setup for drawing the picture on the overlay
         ui->overlay_bg = malloc(sizeof(struct BackgroundPixbuf));
         ui->overlay_bg->buf = buf;
         ui->overlay_bg->x = bg_x_offset;
         ui->overlay_bg->y = bg_y_offset;
         
         // Blurred Background
-        GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_width, window_height);
-        gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_width, window_height, blurred_buf, 0, 0);
+        GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_size[0], window_size[1]);
+        gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_size[0], window_size[1], blurred_buf, 0, 0);
         blur_pixbuf(blurred_buf, 25);
 
         ui->login_bg = malloc(sizeof(struct BackgroundPixbuf));
