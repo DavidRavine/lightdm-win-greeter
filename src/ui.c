@@ -391,49 +391,18 @@ static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer
     return FALSE;
 }
 
-static void calculate_background_size(GdkPixbufLoader* loader, guint width, guint height, gpointer data)
-{
-    int* window_size = (int*) data;
-    // determine optimal image bounds
-    int bg_width, bg_height;
-    if (width > height) {
-        double aspect = (double) width / (double) height;
-        bg_width = (int) (window_size[1] * aspect);
-        bg_height = (int) (window_size[1]);
-    } else {
-        double aspect = (double) height / (double) width;
-        bg_width = (int) (window_size[0]);
-        bg_height = (int) (window_size[0] * aspect);
-    }
-    gdk_pixbuf_loader_set_size(loader, bg_width, bg_height);
-}
-
 static void init_background_image(UI* ui, gchar* background_image)
 {
     char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
     if (strlen(bg_url) > 0) {
         fprintf(stderr, "[GREETER] %s\n", bg_url);
-        int window_size[2] =  {0};
-        gtk_window_get_size(ui->main_window, &window_size[0], &window_size[1]);
+        int window_width, window_height;
+        gtk_window_get_size(ui->main_window, &window_width, &window_height);
 
-        GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
-        // set the correct size during loading
-        g_signal_connect(loader, "size-prepared",
-                        G_CALLBACK(calculate_background_size), window_size);
-        
-        // load image from file
-        gchar* file_buffer;
-        gsize read_bytes;
-        g_file_get_contents(bg_url, &file_buffer, &read_bytes, NULL);
-        gdk_pixbuf_loader_write(loader, (guchar*)file_buffer, read_bytes, NULL);
-        g_free(file_buffer);
-        gdk_pixbuf_loader_close(loader, NULL);
-
-        GdkPixbuf *buf = gdk_pixbuf_loader_get_pixbuf(loader);
-
+        GdkPixbuf* buf = load_image_to_cover(bg_url, (guint) window_width, (guint) window_height, NULL);
         // Offset to center the image
-        gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_size[0] / 2));
-        gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_size[1] / 2));
+        gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
+        gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
 
         // Setup for drawing the picture on the overlay
         ui->overlay_bg = malloc(sizeof(struct BackgroundPixbuf));
@@ -442,8 +411,8 @@ static void init_background_image(UI* ui, gchar* background_image)
         ui->overlay_bg->y = bg_y_offset;
         
         // Blurred Background
-        GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_size[0], window_size[1]);
-        gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_size[0], window_size[1], blurred_buf, 0, 0);
+        GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_width, window_height);
+        gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_width, window_height, blurred_buf, 0, 0);
         blur_pixbuf(blurred_buf, 25);
 
         ui->login_bg = malloc(sizeof(struct BackgroundPixbuf));
@@ -597,6 +566,12 @@ static void attach_config_colors_to_screen(Config* config)
             "background: #f1f1f1;\n"
             "border-color: #f1f1f1;\n"
             "border-width: 0.1rem;\n"
+        "}\n"
+        "#current-user-image {\n"
+            "border-radius: 100%%;\n"
+            "padding: 1em;\n"
+            "border: 0.1em solid #f1f1f1;\n"
+            "background-color: #1b1d1e;\n"
         "}\n"
         "#current-user {\n"
             "font-family: \"Ubuntu\", %s;\n"

@@ -6,11 +6,14 @@
 
 typedef struct LoginUI {
     GtkBox*      login_container;
+    GtkImage*    user_image;
+
     GtkWidget*   username_label;
 
     GtkBox*      password_line;
     GtkWidget*   password_input;
     GtkButton*   login_button;
+
     GtkWidget*   feedback_label;
 } LoginUI;
 

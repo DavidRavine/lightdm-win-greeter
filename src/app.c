@@ -22,6 +22,7 @@ App *initialize_app(int argc, char **argv)
     }
 
     app->config = initialize_config();
+    app->current_user = app->config->login_user;
     app->greeter = lightdm_greeter_new();
     app->ui = initialize_ui(app->config);
 

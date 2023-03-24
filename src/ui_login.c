@@ -1,11 +1,13 @@
 #define _GNU_SOURCE
 #include "ui_login.h"
+#include "utils.h"
 #include <lightdm.h>
 #include <stdio.h>
 
 
 static LoginUI* new_login_ui(void);
 static void create_login_container(LoginUI* ui);
+static void load_and_attach_user_image(LoginUI* ui, Config* config);
 static void create_and_attach_username_label(Config* config, LoginUI* ui);
 static void create_and_attach_password_field(Config* config, LoginUI* ui);
 static void create_and_attach_feedback_label(LoginUI* ui);
@@ -15,6 +17,7 @@ LoginUI* initialize_login_ui(Config *config)
     LoginUI* ui = new_login_ui();
 
     create_login_container(ui);
+    load_and_attach_user_image(ui, config);
 
     create_and_attach_username_label(config, ui);
     create_and_attach_password_field(config, ui);
@@ -102,7 +105,7 @@ static void create_and_attach_password_field(Config* config, LoginUI* ui)
 /* Add a label for feedback to the user */
 static void create_and_attach_feedback_label(LoginUI *ui)
 {
-    ui->feedback_label = gtk_label_new("");
+    ui->feedback_label = gtk_label_new(" ");
     gtk_label_set_justify(GTK_LABEL(ui->feedback_label), GTK_JUSTIFY_CENTER);
     gtk_widget_set_hexpand(GTK_WIDGET(ui->feedback_label), TRUE);
     gtk_widget_set_no_show_all(ui->feedback_label, TRUE);
@@ -110,6 +113,39 @@ static void create_and_attach_feedback_label(LoginUI *ui)
 
     gtk_container_add(GTK_CONTAINER(ui->login_container),
                     GTK_WIDGET(ui->feedback_label));
+}
+
+
+static void load_and_attach_user_image(LoginUI* ui, Config* config)
+{
+    // User face
+    GdkPixbuf* image;
+    GError* error = NULL;
+
+    gchar user_face[100] = {0};
+    int printed = snprintf(user_face, 100, "/home/%s/.face", config->login_user);
+    if (printed) {
+        image = load_image_to_cover(user_face, 100, 100, &error);
+    }
+    if (error != NULL) {
+        g_warning("[GREETER] error loading image %s\n", error->message);
+    }
+    if (!printed || error != NULL) {
+        // Default image
+        image = gtk_icon_theme_load_icon(gtk_icon_theme_get_default(),
+                                        "avatar-default",
+                                        100,
+                                        GTK_ICON_LOOKUP_FORCE_SIZE,
+                                        NULL);
+    }
+
+    ui->user_image = GTK_IMAGE(gtk_image_new_from_pixbuf(image));
+    gtk_widget_set_name(GTK_WIDGET(ui->user_image), "current-user-image");
+    gtk_widget_set_halign(GTK_WIDGET(ui->user_image), GTK_ALIGN_CENTER);
+    // g_object_unref(G_OBJECT(image));
+
+    gtk_container_add(GTK_CONTAINER(ui->login_container),
+                    GTK_WIDGET(ui->user_image));
 }
 
 /* Create a new UI with all values initialized to NULL */

@@ -1,5 +1,6 @@
 /* General Utility Functions */
 #include <lightdm.h>
+#include <glib.h>
 
 #include "app.h"
 #include "compat.h"
@@ -68,3 +69,54 @@ static gchar *get_session_key(gconstpointer data)
     LightDMSession *session = (LightDMSession *) data;
     return (gchar *) lightdm_session_get_key(session);
 }
+
+
+static void calculate_background_size(GdkPixbufLoader* loader, guint width, guint height, gpointer data)
+{
+    guint* window_size = (guint*) data;
+    // determine optimal image bounds
+    int bg_width, bg_height;
+    if (width > height) {
+        double aspect = (double) width / (double) height;
+        bg_width = (int) (window_size[1] * aspect);
+        bg_height = (int) (window_size[1]);
+    } else {
+        double aspect = (double) height / (double) width;
+        bg_width = (int) (window_size[0]);
+        bg_height = (int) (window_size[0] * aspect);
+    }
+    gdk_pixbuf_loader_set_size(loader, bg_width, bg_height);
+    g_warning("[GREETER] set size\n");
+}
+
+/* Loads an image to cover the specified size*/
+GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_height, GError** error)
+{
+    g_warning("[GREETER] loading %s\n", filename);
+    guint container_size[2] = { min_width, min_height };
+
+    GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
+    // set the correct size during loading
+    g_signal_connect(loader, "size-prepared",
+                    G_CALLBACK(calculate_background_size), container_size);
+    
+    // load image from file
+    gchar* file_buffer;
+    gsize read_bytes;
+    g_file_get_contents(filename, &file_buffer, &read_bytes, error);
+    if (error != NULL && *error != NULL)
+        return NULL;
+
+    gdk_pixbuf_loader_write(loader, (guchar*)file_buffer, read_bytes, error);
+    if (error != NULL && *error != NULL) return NULL;
+    g_warning("[GREETER] wrote pixbuf\n");
+
+
+    g_free(file_buffer);
+    gdk_pixbuf_loader_close(loader, NULL);
+    if (error != NULL && *error != NULL) return NULL;
+    g_warning("[GREETER] loaded image\n");
+
+    return gdk_pixbuf_loader_get_pixbuf(loader);
+}
+

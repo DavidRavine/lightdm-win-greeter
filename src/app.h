@@ -17,6 +17,8 @@ typedef struct App_ {
     // Signal Handler ID for the `handle_password` callback
     gulong password_callback_id;
     gulong button_password_callback_id;
+
+    gchar* current_user;
 } App;
 
 
