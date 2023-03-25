@@ -25,6 +25,7 @@ App *initialize_app(int argc, char **argv)
     app->current_user = app->config->login_user;
     app->greeter = lightdm_greeter_new();
     app->ui = initialize_ui(app->config);
+    app->state = APP_COVERED;
 
     // Connect Greeter & UI Signals
     g_signal_connect(app->greeter, "authentication-complete",
@@ -33,7 +34,7 @@ App *initialize_app(int argc, char **argv)
         g_signal_connect(GTK_ENTRY(APP_PASSWORD_INPUT(app)), "activate",
                          G_CALLBACK(handle_password), app);
     app->button_password_callback_id =
-        g_signal_connect(GTK_BUTTON(APP_LOGIN_BUTTON(app)), "activate",
+        g_signal_connect(GTK_BUTTON(APP_LOGIN_BUTTON(app)), "clicked",
                          G_CALLBACK(handle_password), app);
     // This was added to fix a bug where the background window would be focused
     // instead of the main window, preventing users from entering their password.
@@ -45,6 +46,12 @@ App *initialize_app(int argc, char **argv)
     }
     g_signal_connect(GTK_WIDGET(APP_MAIN_WINDOW(app)), "key-press-event",
                      G_CALLBACK(handle_hotkeys), app);
+                     
+    g_signal_connect(GTK_WIDGET(APP_MAIN_WINDOW(app)), "key-press-event",
+                     G_CALLBACK(handle_cover_uncover), app);
+    g_signal_connect(GTK_WIDGET(APP_MAIN_WINDOW(app)), "button-press-event",
+                     G_CALLBACK(handle_cover_uncover), app);
+                     
     // Update the current time every 15 seconds
     handle_time_update(app);
     g_timeout_add_seconds(15, G_SOURCE_FUNC(handle_time_update), app);

@@ -31,7 +31,6 @@ static void place_main_window(GtkWidget *main_window, gpointer user_data);
 static void create_and_attach_layout_stack(UI *ui);
 static void init_background_image(UI* ui, gchar* background_image);
 static void create_and_attach_overlay_container(UI *ui);
-// static void set_main_background(UI *ui, gchar *background_image);
 static void create_and_attach_layout_container(UI *ui, gchar *background_image);
 static void attach_config_colors_to_screen(Config *config);
 
@@ -59,6 +58,18 @@ UI *initialize_ui(Config *config)
     return ui;
 }
 
+void ui_cover(UI* ui)
+{
+    gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_OVERLAY, GTK_STACK_TRANSITION_TYPE_OVER_DOWN);
+    gtk_widget_grab_focus(GTK_WIDGET(ui->overlay_container));
+}
+
+void ui_uncover(UI* ui)
+{
+    gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_LOGIN, GTK_STACK_TRANSITION_TYPE_UNDER_UP);
+    gtk_widget_grab_focus(ui->login_ui->password_input);
+    gtk_entry_set_text(GTK_ENTRY(ui->login_ui->password_input), "");
+}
 
 /* Create a new UI with all values initialized to NULL */
 static UI *new_ui(Config *config)
@@ -233,7 +244,7 @@ static void place_main_window(GtkWidget *main_window, gpointer user_data)
 
     if(OVERLAY_DEBUG && user_data != NULL) {
         UI *ui = (UI*) user_data;
-        gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_LOGIN, GTK_STACK_TRANSITION_TYPE_UNDER_UP);
+        ui_uncover(ui);
     }
 }
 
@@ -366,8 +377,8 @@ static gboolean draw_overlay_background(GtkWidget *widget, cairo_t *cr, gpointer
     cairo_pattern_t* gradient = cairo_pattern_create_linear(0, 0, 0, rect.height);
 
     cairo_pattern_add_color_stop_rgba(gradient, 0, 0, 0, 0, 0);
-    cairo_pattern_add_color_stop_rgba(gradient, 0.55, 0, 0, 0, 0);
-    cairo_pattern_add_color_stop_rgba(gradient, 0.9, 0, 0, 0, 0.3);
+    cairo_pattern_add_color_stop_rgba(gradient, 0.5, 0, 0, 0, 0);
+    cairo_pattern_add_color_stop_rgba(gradient, 0.8, 0, 0, 0, 0.4);
 
     cairo_rectangle(cr, 0, 0, rect.width, rect.height);
     cairo_set_source(cr, gradient);
@@ -565,6 +576,9 @@ static void attach_config_colors_to_screen(Config* config)
             "background: #f1f1f1;\n"
             "border-color: #f1f1f1;\n"
             "border-width: 0.1rem;\n"
+        "}\n"
+        "#login-button:hover {\n"
+            "background: #c7d1d1;\n"
         "}\n"
         "#current-user-image {\n"
             "border-radius: 100%%;\n"

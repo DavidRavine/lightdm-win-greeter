@@ -169,6 +169,7 @@ static void load_and_attach_user_image(LoginUI* ui, Config* config)
     }
 
     if (!printed || error != NULL) {
+        error = NULL;
         printed = snprintf(user_face, 100, "/usr/share/lightdm/users/%s", config->login_user);
         if (printed) {
             image = load_image_to_cover(user_face, 130, 130, &error);
@@ -179,11 +180,12 @@ static void load_and_attach_user_image(LoginUI* ui, Config* config)
     }
     // Default image
     if (!printed || error != NULL) {
+        error = NULL;
         image = gtk_icon_theme_load_icon(gtk_icon_theme_get_default(),
                                         "avatar-default",
                                         100,
                                         GTK_ICON_LOOKUP_FORCE_SIZE,
-                                        NULL);
+                                        &error);
     }
     if (error != NULL) {
         g_warning("[GREETER] icon 'avatar-default' not found: %s\n", error->message);

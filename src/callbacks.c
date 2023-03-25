@@ -9,6 +9,7 @@
 #include "focus_ring.h"
 #include "callbacks.h"
 #include "compat.h"
+#include "ui.h"
 
 static void set_ui_feedback_label(App *app, gchar *feedback_text);
 
@@ -66,16 +67,17 @@ void handle_password(GtkWidget *password_input, App *app)
         g_signal_handler_disconnect(GTK_BUTTON(APP_LOGIN_BUTTON(app)),
                                     app->button_password_callback_id);
         app->password_callback_id = 0;
+        app->button_password_callback_id = 0;
     }
 
     if (!lightdm_greeter_get_is_authenticated(app->greeter)) {
-        gtk_editable_set_editable(GTK_EDITABLE(password_input), FALSE);
+        gtk_editable_set_editable(GTK_EDITABLE(APP_PASSWORD_INPUT(app)), FALSE);
         if (!lightdm_greeter_get_in_authentication(app->greeter)) {
             begin_authentication_as_default_user(app);
         }
         g_message("Using entered password to authenticate");
         const gchar *password_text =
-            gtk_entry_get_text(GTK_ENTRY(password_input));
+            gtk_entry_get_text(GTK_ENTRY(APP_PASSWORD_INPUT(app)));
         compat_greeter_respond(app->greeter, password_text, NULL);
     } else {
         g_message("Password entered while already authenticated");
@@ -126,6 +128,21 @@ gboolean handle_hotkeys(GtkWidget *widget, GdkEventKey *event, App *app)
             return FALSE;
         }
         return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean handle_cover_uncover(GtkWidget *widget, GdkEventKey *event, App *app)
+{
+    if (app->state == APP_COVERED) {
+        app->state = APP_LOGIN;
+        ui_uncover(app->ui);
+        return TRUE;
+        
+    } else if (event->keyval == GDK_KEY_Escape) {
+        app->state = APP_COVERED;
+        ui_cover(app->ui);
     }
 
     return FALSE;

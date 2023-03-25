@@ -37,5 +37,7 @@ typedef struct UI_ {
 
 
 UI *initialize_ui(Config *config);
+void ui_cover(UI* ui);
+void ui_uncover(UI* ui);
 
 #endif

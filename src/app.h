@@ -7,6 +7,10 @@
 #include "focus_ring.h"
 #include "ui.h"
 
+typedef enum AppState_ {
+    APP_COVERED,
+    APP_LOGIN,
+} AppState;
 
 typedef struct App_ {
     Config *config;
@@ -19,6 +23,8 @@ typedef struct App_ {
     gulong button_password_callback_id;
 
     gchar* current_user;
+
+    AppState state;
 } App;
 
 
