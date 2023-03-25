@@ -14,6 +14,7 @@
 #include "ui.h"
 #include "utils.h"
 #include "network.h"
+#include "battery.h"
 
 #define UI_STACK_OVERLAY "overlay"
 #define UI_STACK_LOGIN "login"
@@ -485,7 +486,7 @@ static void create_and_attach_overlay_container(UI *ui)
         ui->overlay_container, GTK_WIDGET(ui->date_label), 0, 1, 1, 1);
 
     // TODO Battery and network status
-    ui->battery_display = gtk_label_new("Bat");
+    ui->battery_display = battery_widget();
     gtk_widget_set_hexpand(GTK_WIDGET(ui->battery_display), TRUE);
     gtk_label_set_xalign(GTK_LABEL(ui->time_label), 1.0f);
 

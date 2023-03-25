@@ -9,7 +9,8 @@ AM_CFLAGS = -g -Wall -O3 --std=c11 -Wextra -Werror --std=c11 -pedantic \
 			-Wswitch-enum -Wconversion -Wunreachable-code -Wformat=2  \
 			-Winit-self                                               \
 			-ftrapv -fverbose-asm \
-			-DCONFIG_FILE=\""$(sysconfdir)/lightdm/lightdm-mini-greeter.conf"\"
+			-DCONFIG_FILE=\""$(sysconfdir)/lightdm/lightdm-mini-greeter.conf"\" \
+			-I/usr/include/libupower-glib
 
 
 # Packaging
@@ -51,6 +52,7 @@ lightdm_mini_greeter_SOURCES = \
 							src/ui.c \
 							src/ui_login.c \
 							src/network.c \
+							src/battery.c \
 							src/utils.c
 
 lightdm_mini_greeter_CFLAGS = \
@@ -61,4 +63,5 @@ lightdm_mini_greeter_CFLAGS = \
 lightdm_mini_greeter_LDADD = \
 							$(GTK_LIBS) \
 							$(LIGHTDM_LIBS) \
-							-lm
+							-lm \
+							-lupower-glib
