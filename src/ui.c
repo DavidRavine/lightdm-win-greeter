@@ -13,6 +13,7 @@
 #include "callbacks.h"
 #include "ui.h"
 #include "utils.h"
+#include "network.h"
 
 #define UI_STACK_OVERLAY "overlay"
 #define UI_STACK_LOGIN "login"
@@ -488,9 +489,9 @@ static void create_and_attach_overlay_container(UI *ui)
     gtk_widget_set_hexpand(GTK_WIDGET(ui->battery_display), TRUE);
     gtk_label_set_xalign(GTK_LABEL(ui->time_label), 1.0f);
 
-    ui->network_display = gtk_label_new("Net");
-    gtk_widget_set_hexpand(GTK_WIDGET(ui->network_display), FALSE);
+    ui->network_display = init_network_widget();
 
+    gtk_grid_insert_column(ui->overlay_container, 2);
     gtk_grid_attach(
         ui->overlay_container, GTK_WIDGET(ui->battery_display), 2, 1, 1, 1);
     gtk_grid_attach(

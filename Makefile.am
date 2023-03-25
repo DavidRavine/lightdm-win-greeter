@@ -50,6 +50,7 @@ lightdm_mini_greeter_SOURCES = \
 							src/focus_ring.c \
 							src/ui.c \
 							src/ui_login.c \
+							src/network.c \
 							src/utils.c
 
 lightdm_mini_greeter_CFLAGS = \
