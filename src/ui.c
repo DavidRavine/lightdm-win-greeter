@@ -231,7 +231,7 @@ static void place_main_window(GtkWidget *main_window, gpointer user_data)
         primary_monitor_geometry.x + primary_monitor_geometry.width / 2 - window_width / 2,
         primary_monitor_geometry.y + primary_monitor_geometry.height / 2 - window_height / 2);
 
-    if(user_data != NULL) {
+    if(OVERLAY_DEBUG && user_data != NULL) {
         UI *ui = (UI*) user_data;
         gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_LOGIN, GTK_STACK_TRANSITION_TYPE_UNDER_UP);
     }
@@ -546,7 +546,6 @@ static void attach_config_colors_to_screen(Config* config)
         "}\n"
         "#overlay {\n"
             "padding: 3em 2em;\n"
-            // "background-color: #CAFEBA;\n"
         "}\n"
         "#password {\n"
             "color: %s;\n"

@@ -86,13 +86,11 @@ static void calculate_background_size(GdkPixbufLoader* loader, guint width, guin
         bg_height = (int) (window_size[0] * aspect);
     }
     gdk_pixbuf_loader_set_size(loader, bg_width, bg_height);
-    g_warning("[GREETER] set size\n");
 }
 
 /* Loads an image to cover the specified size*/
 GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_height, GError** error)
 {
-    g_warning("[GREETER] loading %s\n", filename);
     guint container_size[2] = { min_width, min_height };
 
     GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
@@ -109,13 +107,10 @@ GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_heigh
 
     gdk_pixbuf_loader_write(loader, (guchar*)file_buffer, read_bytes, error);
     if (error != NULL && *error != NULL) return NULL;
-    g_warning("[GREETER] wrote pixbuf\n");
-
 
     g_free(file_buffer);
     gdk_pixbuf_loader_close(loader, NULL);
     if (error != NULL && *error != NULL) return NULL;
-    g_warning("[GREETER] loaded image\n");
 
     return gdk_pixbuf_loader_get_pixbuf(loader);
 }

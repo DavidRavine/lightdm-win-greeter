@@ -5,6 +5,7 @@
 #include "ui_login.h"
 #include "config.h"
 
+#define OVERLAY_DEBUG 0
 
 struct BackgroundPixbuf {
     GdkPixbuf* buf;

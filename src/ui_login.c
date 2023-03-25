@@ -115,6 +115,41 @@ static void create_and_attach_feedback_label(LoginUI *ui)
                     GTK_WIDGET(ui->feedback_label));
 }
 
+static GdkPixbuf* round_user_image(GdkPixbuf* source, int size)
+{
+    const double tau = 2 * G_PI;
+    
+    const int center = size / 2;
+    const int source_width = gdk_pixbuf_get_width(source);
+    const int source_height = gdk_pixbuf_get_height(source);
+
+    GdkPixbuf* dest = NULL;
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size, size);
+    cairo_t* cr = cairo_create(surface);
+    
+    // draw the background color
+    cairo_set_source_rgb(cr, 0.106, 0.113, 0.117);
+    cairo_arc(cr, center, center, center, 0, tau);
+    cairo_fill(cr);
+
+    // draw the image
+    gdk_cairo_set_source_pixbuf(cr, source, center - (source_width / 2), center - (source_height / 2));
+
+    cairo_arc(cr, center, center, center, 0, tau);
+    cairo_fill(cr);
+
+    cairo_arc(cr, center, center, center - 0.6, 0, tau);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_set_line_width(cr, 1.2);
+
+    cairo_stroke(cr);
+
+    dest = gdk_pixbuf_get_from_surface(surface, 0, 0, size, size);
+    cairo_surface_destroy(surface);
+    cairo_destroy(cr);
+
+    return dest;
+}
 
 static void load_and_attach_user_image(LoginUI* ui, Config* config)
 {
@@ -123,26 +158,43 @@ static void load_and_attach_user_image(LoginUI* ui, Config* config)
     GError* error = NULL;
 
     gchar user_face[100] = {0};
-    int printed = snprintf(user_face, 100, "/home/%s/.face", config->login_user);
+    int printed = 0;
+    printed = snprintf(user_face, 100, "/home/%s/.face", config->login_user);
     if (printed) {
-        image = load_image_to_cover(user_face, 100, 100, &error);
+        image = load_image_to_cover(user_face, 130, 130, &error);
+    }
+
+    if (error != NULL) {
+        g_warning("[GREETER] error loading image %s\n", error->message);
+    }
+
+    if (!printed || error != NULL) {
+        printed = snprintf(user_face, 100, "/usr/share/lightdm/users/%s", config->login_user);
+        if (printed) {
+            image = load_image_to_cover(user_face, 130, 130, &error);
+        }
     }
     if (error != NULL) {
         g_warning("[GREETER] error loading image %s\n", error->message);
     }
+    // Default image
     if (!printed || error != NULL) {
-        // Default image
         image = gtk_icon_theme_load_icon(gtk_icon_theme_get_default(),
                                         "avatar-default",
                                         100,
                                         GTK_ICON_LOOKUP_FORCE_SIZE,
                                         NULL);
     }
+    if (error != NULL) {
+        g_warning("[GREETER] icon 'avatar-default' not found: %s\n", error->message);
+        image = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE,  8, 130, 130);
+    }
 
-    ui->user_image = GTK_IMAGE(gtk_image_new_from_pixbuf(image));
-    gtk_widget_set_name(GTK_WIDGET(ui->user_image), "current-user-image");
+    GdkPixbuf* framed_image = round_user_image(image, 130);
+    ui->user_image = GTK_IMAGE(gtk_image_new_from_pixbuf(framed_image));
+    // gtk_widget_set_name(GTK_WIDGET(ui->user_image), "current-user-image");
     gtk_widget_set_halign(GTK_WIDGET(ui->user_image), GTK_ALIGN_CENTER);
-    // g_object_unref(G_OBJECT(image));
+    g_object_unref(G_OBJECT(image));
 
     gtk_container_add(GTK_CONTAINER(ui->login_container),
                     GTK_WIDGET(ui->user_image));
