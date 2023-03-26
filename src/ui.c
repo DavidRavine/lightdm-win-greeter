@@ -462,7 +462,7 @@ static void create_and_attach_layout_container(UI *ui, gchar *background_image)
 static void create_and_attach_overlay_container(UI *ui)
 {
     ui->overlay_container = GTK_GRID(gtk_grid_new());
-    gtk_grid_set_column_spacing(ui->overlay_container, 5);
+    gtk_grid_set_column_spacing(ui->overlay_container, 20);
     gtk_grid_set_row_spacing(ui->overlay_container, 5);
     gtk_widget_set_name(GTK_WIDGET(ui->overlay_container), "overlay");
 
@@ -488,6 +488,7 @@ static void create_and_attach_overlay_container(UI *ui)
     // battery widget
     ui->battery_display = battery_widget();
     gtk_widget_set_hexpand(GTK_WIDGET(ui->battery_display), TRUE);
+    gtk_widget_set_halign(GTK_WIDGET(ui->battery_display), GTK_ALIGN_END);
 
     // network widget
     ui->network_display = init_network_widget();
