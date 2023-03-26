@@ -484,19 +484,20 @@ static void create_and_attach_overlay_container(UI *ui)
         ui->overlay_container, GTK_WIDGET(ui->time_label), 0, 0, 1, 1);
     gtk_grid_attach(
         ui->overlay_container, GTK_WIDGET(ui->date_label), 0, 1, 1, 1);
-
-    // TODO Battery and network status
+    
+    // battery widget
     ui->battery_display = battery_widget();
     gtk_widget_set_hexpand(GTK_WIDGET(ui->battery_display), TRUE);
-    gtk_label_set_xalign(GTK_LABEL(ui->time_label), 1.0f);
 
+    // network widget
     ui->network_display = init_network_widget();
 
-    gtk_grid_insert_column(ui->overlay_container, 2);
     gtk_grid_attach(
         ui->overlay_container, GTK_WIDGET(ui->battery_display), 2, 1, 1, 1);
     gtk_grid_attach(
         ui->overlay_container, GTK_WIDGET(ui->network_display), 3, 1, 1, 1);
+
+    gtk_grid_insert_column(ui->overlay_container, 2);
 
     gtk_stack_add_named(GTK_STACK(ui->layout_stack),
                       GTK_WIDGET(ui->overlay_container),
