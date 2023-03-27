@@ -9,7 +9,8 @@
 
 int main(int argc, char **argv)
 {
-    mlockall(MCL_CURRENT | MCL_FUTURE);  // Keep data out of any swap devices
+    // This is apparently a bad idea, so we disable it (source: lightdm-gtk-greeter)
+    // mlockall(MCL_CURRENT | MCL_FUTURE);  // Keep data out of any swap devices
 
     App *app = initialize_app(argc, argv);
 

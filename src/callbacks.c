@@ -44,8 +44,12 @@ void authentication_complete_cb(LightDMGreeter *greeter, App *app)
     }
     gtk_entry_set_text(GTK_ENTRY(APP_PASSWORD_INPUT(app)), "");
     gtk_editable_set_editable(GTK_EDITABLE(APP_PASSWORD_INPUT(app)), TRUE);
+    gtk_widget_set_sensitive(GTK_WIDGET(APP_LOGIN_BUTTON(app)), TRUE);
     app->password_callback_id =
         g_signal_connect(GTK_ENTRY(APP_PASSWORD_INPUT(app)), "activate",
+                         G_CALLBACK(handle_password), app);
+    app->button_password_callback_id =
+        g_signal_connect(GTK_BUTTON(APP_LOGIN_BUTTON(app)), "clicked",
                          G_CALLBACK(handle_password), app);
 }
 
@@ -72,6 +76,8 @@ void handle_password(GtkWidget *password_input, App *app)
 
     if (!lightdm_greeter_get_is_authenticated(app->greeter)) {
         gtk_editable_set_editable(GTK_EDITABLE(APP_PASSWORD_INPUT(app)), FALSE);
+        gtk_widget_set_sensitive(GTK_WIDGET(APP_LOGIN_BUTTON(app)), FALSE);
+
         if (!lightdm_greeter_get_in_authentication(app->greeter)) {
             begin_authentication_as_default_user(app);
         }

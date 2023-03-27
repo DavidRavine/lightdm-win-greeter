@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=LightDM Win Greeter
+Comment=A greeter, inspired by the Windows 10 lock screen
+Exec=lightdm-win-greeter
+Type=Application
