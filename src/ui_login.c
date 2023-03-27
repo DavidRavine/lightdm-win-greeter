@@ -250,7 +250,9 @@ static char* user_get_pretty_name(const char* username)
             for (int col = 0; col < 4; col++) {
                 read_head += strcspn(read_head, ":") + 1;
             }
-            pretty_name = strndup(read_head, strcspn(read_head, ","));
+            size_t name_length = strcspn(read_head, ",");
+            if (name_length > 0)
+                pretty_name = strndup(read_head, name_length);
             break;
         }
         size_t line_length = strcspn(read_head, "\n") + 1;

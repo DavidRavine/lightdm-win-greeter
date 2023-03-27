@@ -9,6 +9,7 @@
 
 struct BackgroundPixbuf {
     GdkPixbuf* buf;
+    GdkRGBA* default_color;
     gdouble x;
     gdouble y;
 };

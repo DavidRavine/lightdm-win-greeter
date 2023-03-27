@@ -111,8 +111,6 @@ Config *initialize_config(void)
     }
     config->background_color =
         parse_greeter_color_key(keyfile, "background-color", "#1B1D1E");
-    config->background_image_size =
-        parse_greeter_string(keyfile, "greeter-theme", "background-image-size", "auto");
     // Window
     config->window_color =
         parse_greeter_color_key(keyfile, "window-color", "#F92672");
@@ -183,7 +181,6 @@ void destroy_config(Config *config)
     free(config->error_color);
     free(config->background_image);
     free(config->background_color);
-    free(config->background_image_size);
     free(config->window_color);
     free(config->border_color);
     free(config->border_width);

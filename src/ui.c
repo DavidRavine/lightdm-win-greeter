@@ -31,9 +31,9 @@ static void show_default_cursor(GtkWidget *window, gpointer user_data);
 static void setup_main_window(Config *config, UI *ui);
 static void place_main_window(GtkWidget *main_window, gpointer user_data);
 static void create_and_attach_layout_stack(UI *ui);
-static void init_background_image(UI* ui, gchar* background_image);
+static void init_background_image(UI* ui, Config* config);
 static void create_and_attach_overlay_container(UI *ui);
-static void create_and_attach_layout_container(UI *ui, gchar *background_image);
+static void create_and_attach_layout_container(UI *ui);
 static void attach_config_colors_to_screen(Config *config);
 
 
@@ -47,11 +47,11 @@ UI *initialize_ui(Config *config)
     // move_mouse_to_background_window();
     setup_main_window(config, ui);
 
-    init_background_image(ui, config->background_image);
+    init_background_image(ui, config);
     create_and_attach_layout_stack(ui);
 
     create_and_attach_overlay_container(ui);
-    create_and_attach_layout_container(ui, config->background_image);
+    create_and_attach_layout_container(ui);
 
     gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_OVERLAY, GTK_STACK_TRANSITION_TYPE_OVER_DOWN);
 
@@ -369,7 +369,11 @@ static void blur_pixbuf(GdkPixbuf *buf, int radius)
 static gboolean draw_overlay_background(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
     struct BackgroundPixbuf* bg = (struct BackgroundPixbuf*) data;
-    gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
+    if (bg->buf == NULL) {
+        gdk_cairo_set_source_rgba(cr, bg->default_color);
+    } else {
+        gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
+    }
     cairo_paint(cr);
 
     // overlay the gradient
@@ -394,7 +398,11 @@ static gboolean draw_overlay_background(GtkWidget *widget, cairo_t *cr, gpointer
 static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
     struct BackgroundPixbuf* bg = (struct BackgroundPixbuf*) data;
-    gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
+    if (bg->buf == NULL) {
+        gdk_cairo_set_source_rgba(cr, bg->default_color);
+    } else {
+        gdk_cairo_set_source_pixbuf(cr, bg->buf, bg->x, bg->y);
+    }
     cairo_paint(cr);
 
     cairo_set_source_rgba(cr, 0, 0, 0, 0.4);
@@ -404,47 +412,57 @@ static gboolean draw_blurred_background(GtkWidget *widget, cairo_t *cr, gpointer
     return FALSE;
 }
 
-static void init_background_image(UI* ui, gchar* background_image)
+static void init_background_image(UI* ui, Config* config)
 {
-    char *bg_url = strndup(background_image + 1, strlen(background_image) - 2);
+    ui->login_bg = malloc(sizeof(struct BackgroundPixbuf));
+    ui->login_bg->default_color = config->background_color;
+    ui->login_bg->buf = NULL;
+    ui->login_bg->x = 0;
+    ui->login_bg->y = 0;
+
+    ui->overlay_bg = malloc(sizeof(struct BackgroundPixbuf));
+    ui->overlay_bg->default_color = config->background_color;
+    ui->overlay_bg->buf = NULL;
+    ui->overlay_bg->x = 0;
+    ui->overlay_bg->y = 0;
+
+    char *bg_url = strndup(config->background_image + 1, strlen(config->background_image) - 2);
     if (strlen(bg_url) > 0) {
         fprintf(stderr, "[GREETER] %s\n", bg_url);
         int window_width, window_height;
         gtk_window_get_size(ui->main_window, &window_width, &window_height);
 
-        GdkPixbuf* buf = load_image_to_cover(bg_url, (guint) window_width, (guint) window_height, NULL);
-        // Offset to center the image
-        gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
-        gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
+        GError* error = NULL;
+        GdkPixbuf* buf = load_image_to_cover(bg_url, (guint) window_width, (guint) window_height, &error);
 
-        // Setup for drawing the picture on the overlay
-        ui->overlay_bg = malloc(sizeof(struct BackgroundPixbuf));
-        ui->overlay_bg->buf = buf;
-        ui->overlay_bg->x = bg_x_offset;
-        ui->overlay_bg->y = bg_y_offset;
-        
-        // Blurred Background
-        GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_width, window_height);
-        gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_width, window_height, blurred_buf, 0, 0);
-        blur_pixbuf(blurred_buf, 25);
+        if (error == NULL) {
+            // Offset to center the image
+            gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
+            gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
 
-        ui->login_bg = malloc(sizeof(struct BackgroundPixbuf));
-        ui->login_bg->buf = blurred_buf;
-        ui->login_bg->x = 0;
-        ui->login_bg->y = 0;
+            // Setup for drawing the picture on the overlay
+            ui->overlay_bg->buf = buf;
+            ui->overlay_bg->x = bg_x_offset;
+            ui->overlay_bg->y = bg_y_offset;
+            
+            // Blurred Background
+            GdkPixbuf *blurred_buf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, window_width, window_height);
+            gdk_pixbuf_copy_area(buf, (int)-bg_x_offset, (int)-bg_y_offset, window_width, window_height, blurred_buf, 0, 0);
+            blur_pixbuf(blurred_buf, 25);
 
+            ui->login_bg->buf = blurred_buf;
+        }
     }
     free(bg_url);
 }
 
 /* Add a Layout Container for The login Widgets */
-static void create_and_attach_layout_container(UI *ui, gchar *background_image)
+static void create_and_attach_layout_container(UI *ui)
 {
     ui->layout = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5));
     ui->layout_vertical = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 5));
     gtk_widget_set_name(GTK_WIDGET(ui->layout_vertical), "layout-box");
     
-    // set_main_background(ui, background_image);
     g_signal_connect(G_OBJECT(ui->layout), "draw", G_CALLBACK(draw_blurred_background), ui->login_bg);
 
     gtk_box_set_center_widget(GTK_BOX(ui->layout_vertical),
@@ -548,7 +566,7 @@ static void attach_config_colors_to_screen(Config* config)
         "#background.with-image {\n"
             "background-image: image(url(%s), %s);\n"
             "background-repeat: no-repeat;\n"
-            "background-size: %s;\n"
+            "background-size: cover;\n"
             "background-position: center;\n"
         "}\n"
         "#main, #password {\n"
@@ -608,7 +626,6 @@ static void attach_config_colors_to_screen(Config* config)
         // #background.image-background
         , config->background_image
         , gdk_rgba_to_string(config->background_color)
-        , config->background_image_size
         // #main, #password
         , config->border_width
         , gdk_rgba_to_string(config->border_color)

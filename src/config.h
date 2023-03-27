@@ -31,7 +31,6 @@ typedef struct Config_ {
     // Windows
     gchar    *background_image;
     GdkRGBA  *background_color;
-    gchar    *background_image_size;
     GdkRGBA  *window_color;
     GdkRGBA  *border_color;
     gchar    *border_width;
