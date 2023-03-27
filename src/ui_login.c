@@ -3,6 +3,12 @@
 #include "utils.h"
 #include <lightdm.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mman.h>
 
 
 static LoginUI* new_login_ui(void);
@@ -11,6 +17,7 @@ static void load_and_attach_user_image(LoginUI* ui, Config* config);
 static void create_and_attach_username_label(Config* config, LoginUI* ui);
 static void create_and_attach_password_field(Config* config, LoginUI* ui);
 static void create_and_attach_feedback_label(LoginUI* ui);
+static char* user_get_pretty_name(const char* username);
 
 LoginUI* initialize_login_ui(Config *config)
 {
@@ -39,8 +46,9 @@ static void create_login_container(LoginUI* ui)
  */
 static void create_and_attach_username_label(Config* config, LoginUI* ui)
 {
-    // system info: <user>@<hostname>
-    ui->username_label = gtk_label_new(config->login_user);
+    char* username = user_get_pretty_name(config->login_user);
+    ui->username_label = gtk_label_new(username);
+    free(username);
 
     gtk_label_set_xalign(GTK_LABEL(ui->username_label), 0.5f);
     gtk_widget_set_name(GTK_WIDGET(ui->username_label), "current-user");
@@ -194,7 +202,6 @@ static void load_and_attach_user_image(LoginUI* ui, Config* config)
 
     GdkPixbuf* framed_image = round_user_image(image, 130);
     ui->user_image = GTK_IMAGE(gtk_image_new_from_pixbuf(framed_image));
-    // gtk_widget_set_name(GTK_WIDGET(ui->user_image), "current-user-image");
     gtk_widget_set_halign(GTK_WIDGET(ui->user_image), GTK_ALIGN_CENTER);
     g_object_unref(G_OBJECT(image));
 
@@ -213,4 +220,51 @@ static LoginUI* new_login_ui(void)
     ui->feedback_label = NULL;
 
     return ui;
+}
+
+static char* user_get_pretty_name(const char* username)
+{
+
+    int file_descriptor = open("/etc/passwd", O_RDONLY);
+    if (file_descriptor < 0)
+        return strdup(username);
+
+    struct stat passwd_stat;
+    int stat_error = fstat(file_descriptor, &passwd_stat);
+    if (stat_error < 0) {
+        return strdup(username);
+    }
+    char* contents = mmap(NULL, (size_t) passwd_stat.st_size,
+        PROT_READ, MAP_PRIVATE,
+        file_descriptor, 0);
+    
+    char* read_head = contents;
+    size_t username_length = strlen(username);
+
+    char* current_user = strndup(read_head, username_length);
+    char* pretty_name = strdup(username);
+
+    while ((read_head - contents) < passwd_stat.st_size - 1) {
+        if (strcmp(username, current_user) == 0) {
+            // find name
+            for (int col = 0; col < 4; col++) {
+                read_head += strcspn(read_head, ":") + 1;
+            }
+            pretty_name = strndup(read_head, strcspn(read_head, ","));
+            break;
+        }
+        size_t line_length = strcspn(read_head, "\n") + 1;
+        if ((read_head + line_length) >= (contents + passwd_stat.st_size-1)) {
+            break;
+        }
+        read_head += line_length;
+        strncpy(current_user, read_head, username_length);
+    }
+
+    fprintf(stderr, "[GREETER] pretty name: %s\n", pretty_name);
+    munmap(contents, (size_t) passwd_stat.st_size);
+    free(current_user);
+
+    return pretty_name;
+    
 }
