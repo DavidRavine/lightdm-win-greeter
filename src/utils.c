@@ -80,11 +80,11 @@ static void calculate_background_size(GdkPixbufLoader* loader, guint width, guin
     double window_aspect = (double) window_size[0] / (double) window_size[1];
 
     if (aspect < window_aspect) {
-        double scale = window_size[0] / width;
+        double scale = (double) window_size[0] / (double) width;
         bg_width = (int) (window_size[0]);
         bg_height = (int) (height * scale);
     } else {
-        double scale = window_size[1] / height;
+        double scale = (double) window_size[1] / (double) height;
         bg_width = (int) (width * scale);
         bg_height = (int) (window_size[1]);
     }
@@ -127,11 +127,11 @@ GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_heigh
         double window_aspect = (double) min_width / (double) min_height;
 
         if (aspect < window_aspect) {
-            double scale = min_width / width;
+            double scale = (double) min_width / (double) width;
             bg_width = (int) (min_width);
             bg_height = (int) (height * scale);
         } else {
-            double scale = min_height / height;
+            double scale = (double) min_height / (double) height;
             bg_width = (int) (width * scale);
             bg_height = (int) (min_height);
         }
