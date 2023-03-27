@@ -439,6 +439,7 @@ static void init_background_image(UI* ui, Config* config)
             // Offset to center the image
             gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
             gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
+            fprintf(stderr, "[GREETER] %s\n", bg_url);
 
             // Setup for drawing the picture on the overlay
             ui->overlay_bg->buf = buf;

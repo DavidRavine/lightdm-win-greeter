@@ -112,6 +112,28 @@ GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_heigh
     gdk_pixbuf_loader_close(loader, NULL);
     if (error != NULL && *error != NULL) return NULL;
 
-    return gdk_pixbuf_loader_get_pixbuf(loader);
+    GdkPixbuf* intermediate_result = gdk_pixbuf_loader_get_pixbuf(loader);
+
+    guint width = (guint) gdk_pixbuf_get_width(intermediate_result);
+    guint height = (guint) gdk_pixbuf_get_height(intermediate_result);
+
+    if (width < min_width || height < min_height) {
+        int bg_width, bg_height;
+        if (width > height) {
+            double aspect = (double) width / (double) height;
+            bg_width = (int) (min_height * aspect);
+            bg_height = (int) (min_height);
+        } else {
+            double aspect = (double) height / (double) width;
+            bg_width = (int) (min_width);
+            bg_height = (int) (min_width * aspect);
+        }
+
+        GdkPixbuf* result = gdk_pixbuf_scale_simple(intermediate_result, bg_width, bg_height, GDK_INTERP_BILINEAR);
+        g_object_unref(intermediate_result);
+        return result;
+    }
+
+    return intermediate_result;
 }
 
