@@ -36,6 +36,8 @@ static void create_and_attach_overlay_container(UI *ui);
 static void create_and_attach_layout_container(UI *ui);
 static void attach_config_colors_to_screen(Config *config);
 
+static void create_and_attach_power_menu(UI* ui);
+static GdkPixbuf* icon_shutdown(int size);
 
 /* Initialize the Main Window & it's Children */
 UI *initialize_ui(Config *config)
@@ -52,8 +54,10 @@ UI *initialize_ui(Config *config)
 
     create_and_attach_overlay_container(ui);
     create_and_attach_layout_container(ui);
-
+    
     gtk_stack_set_visible_child_full(ui->layout_stack, UI_STACK_OVERLAY, GTK_STACK_TRANSITION_TYPE_OVER_DOWN);
+
+    create_and_attach_power_menu(ui);
 
     attach_config_colors_to_screen(config);
 
@@ -428,7 +432,6 @@ static void init_background_image(UI* ui, Config* config)
 
     char *bg_url = strndup(config->background_image + 1, strlen(config->background_image) - 2);
     if (strlen(bg_url) > 0) {
-        fprintf(stderr, "[GREETER] %s\n", bg_url);
         int window_width, window_height;
         gtk_window_get_size(ui->main_window, &window_width, &window_height);
 
@@ -468,7 +471,7 @@ static void create_and_attach_layout_container(UI *ui)
 
     gtk_box_set_center_widget(GTK_BOX(ui->layout_vertical),
                             GTK_WIDGET(ui->login_ui->login_container));
-
+    
     gtk_box_set_center_widget(GTK_BOX(ui->layout),
                             GTK_WIDGET(ui->layout_vertical));
 
@@ -476,6 +479,51 @@ static void create_and_attach_layout_container(UI *ui)
                       GTK_WIDGET(ui->layout),
                       UI_STACK_LOGIN);
 }
+
+/* Add the power menu */
+static void create_and_attach_power_menu(UI* ui)
+{
+    ui->power_button = GTK_WIDGET(gtk_menu_button_new());
+    gtk_widget_set_name(ui->power_button, "power-button");
+    gtk_widget_set_vexpand(ui->power_button, FALSE);
+    gtk_widget_set_valign(ui->power_button, GTK_ALIGN_END);
+    gtk_button_set_relief(GTK_BUTTON(ui->power_button), GTK_RELIEF_NONE);
+    gtk_menu_button_set_direction(GTK_MENU_BUTTON(ui->power_button), GTK_ARROW_UP);
+
+    GdkPixbuf* icon = icon_shutdown(27);
+    GtkWidget* icon_image = gtk_image_new_from_pixbuf(icon);
+    g_object_unref(icon);
+    gtk_container_add(GTK_CONTAINER(ui->power_button),
+                    GTK_WIDGET(icon_image));
+
+
+    ui->power_menu = GTK_MENU(gtk_menu_new());
+    gtk_widget_set_name(GTK_WIDGET(ui->power_menu), "power-menu");
+    gtk_widget_set_valign(GTK_WIDGET(ui->power_menu), GTK_ALIGN_END);
+    gtk_menu_button_set_popup(GTK_MENU_BUTTON(ui->power_button),
+                            GTK_WIDGET(ui->power_menu));
+
+    ui->power_shutdown = GTK_MENU_ITEM(gtk_menu_item_new_with_label("Shutdown"));
+    g_signal_connect(ui->power_shutdown, "activate", G_CALLBACK(power_shutdown), NULL);
+    ui->power_restart = GTK_MENU_ITEM(gtk_menu_item_new_with_label("Restart"));
+    g_signal_connect(ui->power_restart, "activate", G_CALLBACK(power_restart), NULL);
+    ui->power_suspend = GTK_MENU_ITEM(gtk_menu_item_new_with_label("Suspend"));
+    g_signal_connect(ui->power_suspend, "activate", G_CALLBACK(power_suspend), NULL);
+
+    gtk_menu_shell_append(GTK_MENU_SHELL(ui->power_menu),
+                        GTK_WIDGET(ui->power_suspend));
+    gtk_menu_shell_append(GTK_MENU_SHELL(ui->power_menu),
+                        GTK_WIDGET(ui->power_restart));
+    gtk_menu_shell_append(GTK_MENU_SHELL(ui->power_menu),
+                        GTK_WIDGET(ui->power_shutdown));
+
+    gtk_widget_show(GTK_WIDGET(ui->power_shutdown));
+    gtk_widget_show(GTK_WIDGET(ui->power_restart));
+    gtk_widget_show(GTK_WIDGET(ui->power_suspend));
+
+    gtk_box_pack_end(ui->layout, GTK_WIDGET(ui->power_button), FALSE, FALSE, 0);
+}
+
 
 /* Add a Layout Container for overlay Widgets */
 static void create_and_attach_overlay_container(UI *ui)
@@ -593,6 +641,9 @@ static void attach_config_colors_to_screen(Config* config)
             "box-shadow: none;\n"
             "border-image-width: 0;\n"
         "}\n"
+        "#password *:disabled {\n"
+            "border-color: #cccccc;\n"
+        "}\n"
         "#login-button {\n"
             "border-radius: 0px;\n"
             "color: white;\n"
@@ -602,6 +653,9 @@ static void attach_config_colors_to_screen(Config* config)
         "}\n"
         "#login-button:hover {\n"
             "background: #c7d1d1;\n"
+        "}\n"
+        "#login-button *:disabled {\n"
+            "background: #cccccc;\n"
         "}\n"
         "#current-user-image {\n"
             "border-radius: 100%%;\n"
@@ -613,6 +667,30 @@ static void attach_config_colors_to_screen(Config* config)
             "font-family: \"Ubuntu\", %s;\n"
             "font-size: 1.5em;\n"
             "color: %s;\n"
+        "}\n"
+        "#power-button {\n"
+            "background: none;\n"
+            "border: none;\n"
+            "margin: 1em 1em 1.5em 0em;\n"
+        "}\n"
+        "#power-button:active {\n"
+            "border: none;\n"
+            "border-image: none;\n"
+        "}\n"
+        "#power-menu {\n"
+            "background: #1b1d1e;\n"
+            "border: 0.1em solid #f1f1f1;\n"
+            "padding: 0.4em 0.1em 0.5em 0.1em;\n"
+            "margin: 0em 1em 2em 0em;\n"
+        "}\n"
+        "#power-menu * {\n"
+            "font-family: \"Ubuntu\", \"Sans\";\n"
+            "font-size: 1.1em;\n"
+            "background: #1b1d1e;\n"
+            "padding: 0.4em 0em;\n"
+        "}\n"
+        "#power-menu *:hover, #power-menu *:hover * {\n"
+            "background: #2f3333;\n"
         "}\n"
 
         // *
@@ -657,4 +735,32 @@ static void attach_config_colors_to_screen(Config* config)
 
 
     g_object_unref(provider);
+}
+
+static GdkPixbuf* icon_shutdown(int size)
+{
+    GdkPixbuf* dest = NULL;
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size, size);
+    cairo_t* cr = cairo_create(surface);
+
+    const double line_width = size / 10;
+    const double center = size / 2;
+    const double radius = (size / 2) - (line_width / 2);
+
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_set_line_width(cr, line_width);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+
+    cairo_arc(cr, center, center, radius, -G_PI_4, G_PI + G_PI_4);
+    cairo_stroke(cr);
+
+    cairo_move_to(cr, center, line_width);
+    cairo_line_to(cr, center, center);
+    cairo_stroke(cr);
+
+    dest = gdk_pixbuf_get_from_surface(surface, 0, 0, size, size);
+    cairo_surface_destroy(surface);
+    cairo_destroy(cr);
+
+    return dest;
 }

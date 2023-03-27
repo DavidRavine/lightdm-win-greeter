@@ -16,21 +16,27 @@ struct BackgroundPixbuf {
 
 
 typedef struct UI_ {
-    GtkWindow   **background_windows;
-    int         monitor_count;
-    GtkWindow   *main_window;
-    GtkStack    *layout_stack;
+    GtkWindow**  background_windows;
+    int          monitor_count;
+    GtkWindow*   main_window;
+    GtkStack*    layout_stack;
 
-    GtkBox      *layout;
-    GtkBox      *layout_vertical;
+    GtkBox*      layout;
+    GtkBox*      layout_vertical;
 
-    GtkGrid     *overlay_container;
-    GtkWidget   *time_label;
-    GtkWidget   *date_label;
-    GtkWidget   *battery_display;
-    GtkWidget   *network_display;
+    GtkGrid*     overlay_container;
+    GtkWidget*   time_label;
+    GtkWidget*   date_label;
+    GtkWidget*   battery_display;
+    GtkWidget*   network_display;
 
-    LoginUI     *login_ui;
+    GtkWidget*   power_button;
+    GtkMenu*     power_menu;
+    GtkMenuItem* power_shutdown;
+    GtkMenuItem* power_restart;
+    GtkMenuItem* power_suspend;
+
+    LoginUI*     login_ui;
 
     struct BackgroundPixbuf* overlay_bg;
     struct BackgroundPixbuf* login_bg;

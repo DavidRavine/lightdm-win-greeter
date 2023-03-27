@@ -13,4 +13,8 @@ gboolean handle_hotkeys(GtkWidget* widget, GdkEventKey* event, App* app);
 gboolean handle_time_update(App* app);
 gboolean handle_cover_uncover(GtkWidget* widget, GdkEventKey* event, App* app);
 
+void power_shutdown(GtkWidget* item);
+void power_restart(GtkWidget* item);
+void power_suspend(GtkWidget* item);
+
 #endif

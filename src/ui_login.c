@@ -93,7 +93,7 @@ static void create_and_attach_password_field(Config* config, LoginUI* ui)
                             GTK_ICON_LOOKUP_FORCE_SYMBOLIC,
                             NULL);
     if (!icon) {
-        fprintf(stderr, "[GREETER] icon not found!\n");
+        g_warning("[GREETER] icon not found!\n");
     }
 
     GtkImage* icon_image = GTK_IMAGE(gtk_image_new_from_pixbuf(icon));
@@ -263,7 +263,6 @@ static char* user_get_pretty_name(const char* username)
         strncpy(current_user, read_head, username_length);
     }
 
-    fprintf(stderr, "[GREETER] pretty name: %s\n", pretty_name);
     munmap(contents, (size_t) passwd_stat.st_size);
     free(current_user);
 

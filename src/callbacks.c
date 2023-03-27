@@ -178,3 +178,16 @@ static void set_ui_feedback_label(App *app, gchar *feedback_text)
     }
     gtk_label_set_text(GTK_LABEL(APP_FEEDBACK_LABEL(app)), feedback_text);
 }
+
+void power_shutdown(GtkWidget* item)
+{
+    lightdm_shutdown(NULL);
+}
+void power_restart(GtkWidget* item)
+{
+    lightdm_restart(NULL);
+}
+void power_suspend(GtkWidget* item)
+{
+    lightdm_suspend(NULL);
+}
