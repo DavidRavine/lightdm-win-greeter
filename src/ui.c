@@ -443,6 +443,9 @@ static void init_background_image(UI* ui, Config* config)
             gdouble bg_x_offset = -((gdk_pixbuf_get_width(buf) / 2) - (window_width / 2));
             gdouble bg_y_offset = -((gdk_pixbuf_get_height(buf) / 2) - (window_height / 2));
             fprintf(stderr, "[GREETER] %s\n", bg_url);
+            fprintf(stderr, "[GREETER] copying: (%f, %f) %d x %d\n", bg_x_offset, bg_y_offset, window_width, window_height);
+            fprintf(stderr, "[GREETER] from: %d x %d\n", 
+                gdk_pixbuf_get_width(buf), gdk_pixbuf_get_height(buf));
 
             // Setup for drawing the picture on the overlay
             ui->overlay_bg->buf = buf;

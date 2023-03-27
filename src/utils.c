@@ -76,15 +76,19 @@ static void calculate_background_size(GdkPixbufLoader* loader, guint width, guin
     guint* window_size = (guint*) data;
     // determine optimal image bounds
     int bg_width, bg_height;
-    if (width > height) {
-        double aspect = (double) width / (double) height;
-        bg_width = (int) (window_size[1] * aspect);
-        bg_height = (int) (window_size[1]);
-    } else {
-        double aspect = (double) height / (double) width;
+    double aspect = (double) width / (double) height;
+    double window_aspect = (double) window_size[0] / (double) window_size[1];
+
+    if (aspect < window_aspect) {
+        double scale = window_size[0] / width;
         bg_width = (int) (window_size[0]);
-        bg_height = (int) (window_size[0] * aspect);
+        bg_height = (int) (height * scale);
+    } else {
+        double scale = window_size[1] / height;
+        bg_width = (int) (width * scale);
+        bg_height = (int) (window_size[1]);
     }
+
     gdk_pixbuf_loader_set_size(loader, bg_width, bg_height);
 }
 
@@ -119,14 +123,17 @@ GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_heigh
 
     if (width < min_width || height < min_height) {
         int bg_width, bg_height;
-        if (width > height) {
-            double aspect = (double) width / (double) height;
-            bg_width = (int) (min_height * aspect);
-            bg_height = (int) (min_height);
-        } else {
-            double aspect = (double) height / (double) width;
+        double aspect = (double) width / (double) height;
+        double window_aspect = (double) min_width / (double) min_height;
+
+        if (aspect < window_aspect) {
+            double scale = min_width / width;
             bg_width = (int) (min_width);
-            bg_height = (int) (min_width * aspect);
+            bg_height = (int) (height * scale);
+        } else {
+            double scale = min_height / height;
+            bg_width = (int) (width * scale);
+            bg_height = (int) (min_height);
         }
 
         GdkPixbuf* result = gdk_pixbuf_scale_simple(intermediate_result, bg_width, bg_height, GDK_INTERP_BILINEAR);
