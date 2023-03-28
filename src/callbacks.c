@@ -67,8 +67,9 @@ void authentication_complete_cb(LightDMGreeter *greeter, App *app)
 void handle_password(GtkWidget *password_input, App *app)
 {
     // Reset to default screensaver values (source GTK Greeter)
-    if (lightdm_greeter_get_lock_hint(app->greeter))
+    if (lightdm_greeter_get_lock_hint(app->greeter)) {
         XSetScreenSaver(gdk_x11_display_get_xdisplay(gdk_display_get_default()), app->timeout, app->interval, app->prefer_blanking, app->allow_exposures);
+    }
 
     if (app->password_callback_id != 0) {
         g_signal_handler_disconnect(GTK_ENTRY(APP_PASSWORD_INPUT(app)),

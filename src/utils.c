@@ -12,11 +12,13 @@ static gchar *get_session_key(gconstpointer data);
 
 
 /* Connect to the LightDM daemon or exit with an error */
-void connect_to_lightdm_daemon(LightDMGreeter *greeter)
+gboolean connect_to_lightdm_daemon(LightDMGreeter *greeter)
 {
     if (!lightdm_greeter_connect_sync(greeter, NULL)) {
         g_critical("Could not connect to the LightDM daemon");
+        return FALSE;
     }
+    return TRUE;
 }
 
 
