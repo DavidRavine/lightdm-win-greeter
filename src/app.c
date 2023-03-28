@@ -2,16 +2,17 @@
 #include <stdlib.h>
 
 #include <gtk/gtk.h>
+#include <gtk/gtkx.h>
 #include <lightdm.h>
 
 #include "app.h"
 #include "callbacks.h"
 #include "config.h"
 
-
 /* Initialize the Greeter & UI */
 App *initialize_app(int argc, char **argv)
 {
+    
     g_log_set_always_fatal(G_LOG_LEVEL_CRITICAL);
     gtk_init(&argc, &argv);
 
@@ -30,6 +31,17 @@ App *initialize_app(int argc, char **argv)
     // Connect Greeter & UI Signals
     g_signal_connect(app->greeter, "authentication-complete",
                      G_CALLBACK(authentication_complete_cb), app);
+    
+    // Make the greeter behave a bit more like a screensaver if used as un/lock-screen by blanking the screen
+    // (source: GTK Greeter)
+    if (lightdm_greeter_get_lock_hint (app->greeter))
+    {
+        Display *display = gdk_x11_display_get_xdisplay (gdk_display_get_default ());
+        XGetScreenSaver (display, &app->timeout, &app->interval, &app->prefer_blanking, &app->allow_exposures);
+        XForceScreenSaver (display, ScreenSaverActive);
+        XSetScreenSaver (display, 30, 0, ScreenSaverActive, DefaultExposures);
+    }
+
     app->password_callback_id =
         g_signal_connect(GTK_ENTRY(APP_PASSWORD_INPUT(app)), "activate",
                          G_CALLBACK(handle_password), app);

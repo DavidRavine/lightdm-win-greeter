@@ -25,6 +25,10 @@ typedef struct App_ {
     gchar* current_user;
 
     AppState state;
+    int timeout;
+    int interval;
+    int prefer_blanking;
+    int allow_exposures;
 } App;
 
 

@@ -63,4 +63,5 @@ lightdm_win_greeter_LDADD = \
 							$(GTK_LIBS) \
 							$(LIGHTDM_LIBS) \
 							-lm \
+							-lX11 \
 							-lupower-glib
