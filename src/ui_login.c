@@ -70,6 +70,7 @@ static void create_and_attach_password_field(Config* config, LoginUI* ui)
 
     // Create the input-field
     ui->password_input = (gtk_entry_new());
+    gtk_widget_set_hexpand(GTK_WIDGET(ui->password_input), TRUE);
     gtk_entry_set_visibility(GTK_ENTRY(ui->password_input), FALSE);
     if (config->password_char != NULL) {
         gtk_entry_set_invisible_char(GTK_ENTRY(ui->password_input), *config->password_char);
@@ -146,9 +147,10 @@ static GdkPixbuf* round_user_image(GdkPixbuf* source, int size)
     cairo_arc(cr, center, center, center, 0, tau);
     cairo_fill(cr);
 
+    // draw the outline
     cairo_arc(cr, center, center, center - 0.6, 0, tau);
     cairo_set_source_rgb(cr, 1, 1, 1);
-    cairo_set_line_width(cr, 1.2);
+    cairo_set_line_width(cr, 1.6);
 
     cairo_stroke(cr);
 
