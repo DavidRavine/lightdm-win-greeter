@@ -69,7 +69,7 @@ static void create_and_attach_password_field(Config* config, LoginUI* ui)
     ui->password_line = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0));
 
     // Create the input-field
-    ui->password_input = gtk_entry_new();
+    ui->password_input = (gtk_entry_new());
     gtk_entry_set_visibility(GTK_ENTRY(ui->password_input), FALSE);
     if (config->password_char != NULL) {
         gtk_entry_set_invisible_char(GTK_ENTRY(ui->password_input), *config->password_char);
@@ -250,7 +250,7 @@ static char* user_get_pretty_name(const char* username)
             for (int col = 0; col < 4; col++) {
                 read_head += strcspn(read_head, ":") + 1;
             }
-            size_t name_length = strcspn(read_head, ",");
+            size_t name_length = strcspn(read_head, ",:");
             if (name_length > 0)
                 pretty_name = strndup(read_head, name_length);
             break;

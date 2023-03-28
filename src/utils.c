@@ -89,6 +89,7 @@ static void calculate_background_size(GdkPixbufLoader* loader, guint width, guin
         bg_height = (int) (window_size[1]);
     }
 
+    fprintf(stderr, "[GREETER] setting size %d x %d\n", bg_width, bg_height);
     gdk_pixbuf_loader_set_size(loader, bg_width, bg_height);
 }
 
@@ -97,6 +98,7 @@ GdkPixbuf* load_image_to_cover(gchar* filename, guint min_width, guint min_heigh
 {
     guint container_size[2] = { min_width, min_height };
 
+    fprintf(stderr, "[GREETER] loading %s\n", filename);
     GdkPixbufLoader* loader = gdk_pixbuf_loader_new();
     // set the correct size during loading
     g_signal_connect(loader, "size-prepared",
